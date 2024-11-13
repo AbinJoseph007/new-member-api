@@ -1,5 +1,6 @@
 const express = require("express");
 const nodemailer = require("nodemailer");
+require("dotenv").config()
 const app = express();
 
 app.use(express.json()); // Parse JSON bodies for POST requests
@@ -12,8 +13,8 @@ const transporter = nodemailer.createTransport({
     port: 587,
     secure: false,
     auth: {
-        user: "abinjosephonline.in@gmail.com",
-        pass: "hbme mhff xgob zzyj",
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
     },
 });
 
