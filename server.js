@@ -70,7 +70,8 @@ app.post("/send-otp", async (req, res) => {
       {
         fields: {
           "First Name": firstName,
-          "Last Name": lastName,
+          "Last Name": lastName, // Ensure this matches Airtable's field name exactly
+          "Email": email, // Ensure this matches Airtable's field name exactly
           "Company": company,
           "Membership Company ID": membershipCompanyId,
           "Verification Code": otp,
