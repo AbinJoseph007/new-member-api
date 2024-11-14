@@ -45,7 +45,7 @@ const generateOTP = () => {
 // Endpoint to handle form submission and send OTP email
 app.post("/send-otp", async (req, res) => {
   console.log("Form data received:", req.body); // Debugging log
-  const { firstName, lastName, company, email, pin } = req.body; // Extract data from Webflow form
+  const { firstName, LastName, company, email, pin } = req.body; // Extract data from Webflow form
 
   // Map `pin` to `membershipCompanyId`, allowing it to be optional
   const membershipCompanyId = pin || null;
@@ -56,8 +56,8 @@ app.post("/send-otp", async (req, res) => {
     from: `"Your Service" <${process.env.EMAIL_USER}>`,
     to: email,
     subject: "Your OTP Code",
-    text: `Hello ${firstName || "User"} ${lastName || ""},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`,
-    html: `<p>Hello ${firstName || "User"} ${lastName || ""},</p><p>Your OTP code is: <strong>${otp}</strong></p><p>Please use this code to complete your verification.</p>`
+    text: `Hello ${firstName || "User"} ${LastName || ""},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`,
+    html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p><p>Your OTP code is: <strong>${otp}</strong></p><p>Please use this code to complete your verification.</p>`
   };
 
   try {
@@ -70,7 +70,7 @@ app.post("/send-otp", async (req, res) => {
       {
         fields: {
           "First Name": firstName,
-          "Last Name": lastName, // Ensure this matches Airtable's field name exactly
+          "Last Name": LastName, // Ensure this matches Airtable's field name exactly
           "Email": email, // Ensure this matches Airtable's field name exactly
           "Company": company,
           "Membership Company ID": membershipCompanyId,
