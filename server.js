@@ -54,13 +54,14 @@ app.post("/send-otp", async (req, res) => {
     to: email,
     subject: "Your OTP Code",
     text: `Hello ${firstName || "User"} ${lastName || ""},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`,
+    html: `<p>Hello ${firstName || "User"} ${lastName || ""},</p><p>Your OTP code is: <strong>${otp}</strong></p><p>Please use this code to complete your verification.</p>`
   };
 
   try {
     // Send email and handle response
     await transporter.sendMail(mailOptions);
     console.log("OTP email sent successfully to:", email);
-    res.status(200).json({ message: "OTP sent successfully!" });
+    res.status(200).json({ message: "OTP sent successfully!", otp });
   } catch (error) {
     console.error("Error sending OTP email:", error);
     res.status(500).json({ error: "Failed to send OTP", details: error.message });
