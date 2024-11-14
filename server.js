@@ -37,20 +37,13 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Root route for base URL testing (Landing page)
-app.get("/", (req, res) => {
-  res.send("Server is running and ready to accept requests.");
-});
-
 // Endpoint to handle form submission and send OTP email
 app.post("/send-otp", async (req, res) => {
   console.log("Form data received:", req.body); // Debugging log
-  const { firstName, lastName, company, membershipCompanyId, email } = req.body;
+  const { firstName, lastName, company, email, pin } = req.body; // Extract data from Webflow form
 
-  // Validate the presence of required fields
-  if (!email || !firstName || !lastName || !company || !membershipCompanyId) {
-    return res.status(400).json({ error: "All fields are required" });
-  }
+  // Map `pin` to `membershipCompanyId`, allowing it to be optional
+  const membershipCompanyId = pin || null;
 
   const otp = generateOTP();
 
@@ -68,7 +61,7 @@ app.post("/send-otp", async (req, res) => {
     console.log("OTP email sent successfully to:", email);
 
     // Add data to Airtable using the Airtable API
-    await base('Member/Non-member sign up details').create([
+    await base('Member and Non-member sign up details').create([
       {
         fields: {
           "First Name": firstName,
