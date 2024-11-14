@@ -1,21 +1,32 @@
 const express = require("express");
 const nodemailer = require("nodemailer");
-require("dotenv").config()
+const cors = require("cors");
+require("dotenv").config();
+
 const app = express();
 
-app.use(express.json()); // Parse JSON bodies for POST requests
+// CORS configuration to allow requests from your Webflow site
+const corsOptions = {
+  origin: "https://biaw-stage-3d0019b2f20edef3124873f20de2.webflow.io/signup", // Replace with your actual Webflow URL
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
-// Configure Nodemailer
+// Root route for base URL testing
+app.get("/", (req, res) => {
+    res.send("Server is running and ready to accept requests.");
+});
+
+// Configure Nodemailer with Gmail SMTP settings
 const transporter = nodemailer.createTransport({
     service: "gmail",
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-    },
+        user: process.env.EMAIL_USER, // Gmail email from environment variables
+        pass: process.env.EMAIL_PASSWORD // Gmail password or app-specific password
+    }
 });
 
 // Function to generate a 6-digit OTP
@@ -23,20 +34,21 @@ const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Endpoint to handle form submission and send OTP
+// Endpoint to handle form submission and send OTP email
 app.post("/send-otp", async (req, res) => {
     const { firstName, lastName, email } = req.body;
 
+    // Validate email
     if (!email) {
         return res.status(400).json({ error: "Email is required" });
     }
 
     const otp = generateOTP();
     const mailOptions = {
-        from: '"Your Service" <your-email@gmail.com>',
-        to: email, // Send OTP to the dynamic email address from the form
+        from: `"Your Service" <${process.env.EMAIL_USER}>`,
+        to: email,
         subject: "Your OTP Code",
-        text: `Hello ${firstName} ${lastName},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`,
+        text: `Hello ${firstName} ${lastName},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`
     };
 
     try {
@@ -50,7 +62,7 @@ app.post("/send-otp", async (req, res) => {
 });
 
 // Start the server
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
