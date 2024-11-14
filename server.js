@@ -20,6 +20,11 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Root route for base URL testing
+app.get("/", (req, res) => {
+    res.send("Server is running and ready to accept requests.");
+  });
+
 // Nodemailer transporter configuration
 const transporter = nodemailer.createTransport({
   service: "gmail",
