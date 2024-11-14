@@ -2,6 +2,7 @@ const express = require("express");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 require("dotenv").config();
+const Airtable = require("airtable");
 
 const app = express();
 
@@ -19,11 +20,6 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Root route for base URL testing
-app.get("/", (req, res) => {
-  res.send("Server is running and ready to accept requests.");
-});
-
 // Nodemailer transporter configuration
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -33,22 +29,31 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Airtable configuration
+const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
+
 // Function to generate a 6-digit OTP
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+// Root route for base URL testing (Landing page)
+app.get("/", (req, res) => {
+  res.send("Server is running and ready to accept requests.");
+});
+
 // Endpoint to handle form submission and send OTP email
 app.post("/send-otp", async (req, res) => {
   console.log("Form data received:", req.body); // Debugging log
-  const { firstName, lastName, email } = req.body;
+  const { firstName, lastName, company, membershipCompanyId, email } = req.body;
 
   // Validate the presence of required fields
-  if (!email) {
-    return res.status(400).json({ error: "Email is required" });
+  if (!email || !firstName || !lastName || !company || !membershipCompanyId) {
+    return res.status(400).json({ error: "All fields are required" });
   }
 
   const otp = generateOTP();
+
   const mailOptions = {
     from: `"Your Service" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -58,13 +63,29 @@ app.post("/send-otp", async (req, res) => {
   };
 
   try {
-    // Send email and handle response
+    // Send OTP email
     await transporter.sendMail(mailOptions);
     console.log("OTP email sent successfully to:", email);
-    res.status(200).json({ message: "OTP sent successfully!", otp });
+
+    // Add data to Airtable using the Airtable API
+    await base('Member/Non-member sign up details').create([
+      {
+        fields: {
+          "First Name": firstName,
+          "Last Name": lastName,
+          "Company": company,
+          "Membership Company ID": membershipCompanyId,
+          "Verification Code": otp,
+        },
+      },
+    ]);
+
+    console.log("Data added to Airtable");
+
+    res.status(200).json({ message: "OTP sent successfully and data added to Airtable", otp });
   } catch (error) {
-    console.error("Error sending OTP email:", error);
-    res.status(500).json({ error: "Failed to send OTP", details: error.message });
+    console.error("Error:", error);
+    res.status(500).json({ error: "Failed to send OTP or add data to Airtable", details: error.message });
   }
 });
 
