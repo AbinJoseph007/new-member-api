@@ -52,16 +52,28 @@ app.post("/send-otp", async (req, res) => {
 
   const otp = generateOTP();
 
-  const mailOptions = {
-    from: `"Your Service" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Your OTP Code",
-    text: `Hello ${firstName || "User"} ${LastName || ""},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`,
-    html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p><p>Your OTP code is: <strong>${otp}</strong></p><p>Please use this code to complete your verification.</p>`
-  };
-
   try {
+    // Check if the email already exists in Airtable
+    const records = await base('Member and Non-member sign up details')
+      .select({
+        filterByFormula: `{Email} = "${email}"`, // Airtable formula to match the email
+      })
+      .firstPage();
+
+    if (records.length > 0) {
+      // Email already exists
+      return res.status(400).json({ error: "This email is already registered. Please use a different email." });
+    }
+
     // Send OTP email
+    const mailOptions = {
+      from: `"Your Service" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your OTP Code",
+      text: `Hello ${firstName || "User"} ${LastName || ""},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`,
+      html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p><p>Your OTP code is: <strong>${otp}</strong></p><p>Please use this code to complete your verification.</p>`,
+    };
+
     await transporter.sendMail(mailOptions);
     console.log("OTP email sent successfully to:", email);
 
@@ -87,6 +99,7 @@ app.post("/send-otp", async (req, res) => {
     res.status(500).json({ error: "Failed to send OTP or add data to Airtable", details: error.message });
   }
 });
+
 
 // Start the server
 const PORT = process.env.PORT || 3000;
