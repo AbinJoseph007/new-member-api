@@ -100,6 +100,36 @@ app.post("/send-otp", async (req, res) => {
   }
 });
 
+app.post("/verify-otp", async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    // Retrieve the record with the matching email and OTP
+    const records = await base('Member and Non-member sign up details')
+      .select({
+        filterByFormula: `{Email} = '${email}'`
+      })
+      .firstPage();
+
+    if (records.length === 0) {
+      return res.status(400).json({ error: "Email not found or invalid." });
+    }
+
+    const record = records[0];
+    const storedOTP = record.fields["Verification Code"];
+
+    // Check if the entered OTP matches
+    if (storedOTP === otp) {
+      return res.status(200).json({ message: "OTP verified successfully." });
+    } else {
+      return res.status(400).json({ error: "Invalid OTP. Please try again." });
+    }
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    res.status(500).json({ error: "Server error while verifying OTP." });
+  }
+});
+
 
 // Start the server
 const PORT = process.env.PORT || 3000;
