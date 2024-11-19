@@ -96,18 +96,21 @@ app.post("/verify-otp", async (req, res) => {
   try {
     const records = await base('Member and Non-member sign up details')
       .select({
-        filterByFormula: `AND({Email} = '${email}', {Verification Code} = '${otp}')`
+        filterByFormula: `AND({Email} = '${email}', {Verification Code} = '${otp}')`,
       })
       .firstPage();
+
     if (records.length === 0) {
-      return res.status(400).json({ error: "Invalid email or OTP." });
+      return res.status(400).json({ error: "Invalid email or OTP." }); // Explicit error response
     }
-    return res.status(200).json({ message: "OTP verified successfully." });
+
+    return res.status(200).json({ message: "OTP verified successfully." }); // Success
   } catch (error) {
     console.error("Error verifying OTP:", error);
-    res.status(500).json({ error: "Server error while verifying OTP." });
+    res.status(500).json({ error: "Server error while verifying OTP." }); // Server error response
   }
 });
+
 
 
 const PORT = process.env.PORT || 3000;
