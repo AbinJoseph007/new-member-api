@@ -10,8 +10,8 @@ const app = express();
 // CORS configuration
 const corsOptions = {
   origin: [
-    "https://biaw-stage-3d0019b2f20edef3124873f20de2.webflow.io",
-    "https://biaw-stage-3d0019b2f20edef3124873f20de2.webflow.io/signup",
+    "https://biaw-stage-api.webflow.io/",
+    "https://biaw-stage-api.webflow.io/signup",
   ],
   optionsSuccessStatus: 200,
 };
