@@ -8,19 +8,22 @@ const axios = require("axios");
 const app = express();
 
 // CORS configuration
-const corsOptions = {
-  origin: [
-    "https://biaw-stage-api.webflow.io/",
-    "https://biaw-stage-api.webflow.io/signup",
-  ],
-  optionsSuccessStatus: 200,
-};
-app.use(cors(corsOptions));
+// CORS configuration
+const allowedOrigins = [
+  "https://biaw-stage-api.webflow.io",
+];
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 // Middleware for parsing JSON and URL-encoded data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 // Root route
 app.get("/", (req, res) => {
   res.send("Server is running and ready to accept requests.");
