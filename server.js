@@ -11,6 +11,7 @@ const app = express();
 // CORS configuration
 const allowedOrigins = [
   "https://biaw-stage-api.webflow.io",
+  "https://biaw-stage-api.webflow.io/signup"
 ];
 app.use(
   cors({
