@@ -11,7 +11,7 @@ const app = express();
 // CORS configuration
 const allowedOrigins = [
   "https://biaw-stage-api.webflow.io",
-  "https://biaw-stage-api.webflow.io/signup"
+  "https://biaw-stage-api.webflow.io/signup",
 ];
 app.use(
   cors({
@@ -56,7 +56,7 @@ const checkCompanyId = async (companyId) => {
 
     if (records.length === 0) return null;
     return records[0].fields["Member Type"];
-    
+
   } catch (error) {
     console.error("Error checking Company ID:", error);
     throw new Error("Failed to verify Company ID.");
@@ -114,14 +114,21 @@ app.post("/send-otp", async (req, res) => {
         return res.status(400).json({ error: "Invalid Company ID." });
       }
     }
-    
+
 
     // Send OTP via email
     const mailOptions = {
       from: `"BIAW" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Your OTP Code",
-      text: `Hello ${firstName || "User"} ${LastName || ""},\n\nYour OTP code is: ${otp}\n\nPlease use this code to complete your verification.`,
+      text: `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, Please verify your email.
+Your verification is below -- enter it in your open browser window and we'll get you signed in!\n\n
+\n\nYour OTP code is: ${otp}\n\n
+
+\n\nhttps://biaw-stage-api.webflow.io/account-verification\n\n
+\n\nIf you didn’t request this email, there’s nothing to worry about — you can safely ignore it.\n\n
+
+\n\nWelcome and thanks!.\n\n`,
       html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p><p>Your OTP code is: <strong>${otp}</strong></p><p>Please use this code to complete your verification.</p>`,
     };
 
@@ -166,7 +173,7 @@ app.post("/verify-otp", async (req, res) => {
     }
 
     const record = records[0];
-    const { "First Name": firstName, "Last Name": lastName, "Company": company,"Membership Company ID": membershipCompanyId, "Member Type": memberType } = record.fields;
+    const { "First Name": firstName, "Last Name": lastName, "Company": company, "Membership Company ID": membershipCompanyId, "Member Type": memberType } = record.fields;
 
     // Prepare data for Memberstack
     const memberData = {
@@ -175,8 +182,8 @@ app.post("/verify-otp", async (req, res) => {
       customFields: {
         "first-name": firstName || "", // Default to empty string if undefined
         "last-name": lastName || "",
-        company: company || "N/A", 
-        "companyid":membershipCompanyId,// Default to "N/A" if no company provided
+        company: company || "N/A",
+        "companyid": membershipCompanyId,// Default to "N/A" if no company provided
         "mbr-type": memberType || "Standard", // Default to "Standard" if no member type provided
       },
     };
@@ -190,7 +197,7 @@ app.post("/verify-otp", async (req, res) => {
 
     await base("Member and Non-member sign up details").update(record.id, {
       "Verification Status": "Verified", // Update the verification status field
-      "Member ID":  memberstackResponse.data.id,       // Update the Member ID field
+      "Member ID": memberstackResponse.data.id,       // Update the Member ID field
     });
 
     // Respond with success message
