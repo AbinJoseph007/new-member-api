@@ -122,14 +122,19 @@ app.post("/send-otp", async (req, res) => {
       to: email,
       subject: "Your OTP Code",
       text: `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, Please verify your email.
-Your verification is below -- enter it in your open browser window and we'll get you signed in!\n\n
-\n\nYour OTP code is: ${otp}\n\n
+            Your verification is below -- enter it in your open browser window and we'll get you signed in!\n\n
+             \n\nYour OTP code is: ${otp}\n\n
 
-\n\nhttps://biaw-stage-api.webflow.io/account-verification\n\n
-\n\nIf you didn’t request this email, there’s nothing to worry about — you can safely ignore it.\n\n
+              \n\nhttps://biaw-stage-api.webflow.io/account-verification\n\n
+              \n\nIf you didn’t request this email, there’s nothing to worry about — you can safely ignore it.\n\n
 
-\n\nWelcome and thanks!.\n\n`,
-      html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p><p>Your OTP code is: <strong>${otp}</strong></p><p>Please use this code to complete your verification.</p>`,
+             \n\nWelcome and thanks!.\n\n`,
+      html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
+      <p>Thank you for joining! To finish signing up, Please verify your email.
+      Your verification is below -- enter it in your open browser window and we'll get you signed in!</p>
+      <p>Your OTP code is: <strong>${otp}</strong></p>
+      <p><a href="https://biaw-stage-api.webflow.io/account-verification"></a></p>
+      <p>Please use this code to complete your verification.</p>`,
     };
 
     await transporter.sendMail(mailOptions);
