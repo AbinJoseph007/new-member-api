@@ -188,6 +188,11 @@ app.post("/verify-otp", async (req, res) => {
 
     console.log("Memberstack Response:", memberstackResponse);
 
+    await base("Member and Non-member sign up details").update(record.id, {
+      "Verification Status": "Verified", // Update the verification status field
+      "Member ID":  memberstackResponse.data.id,       // Update the Member ID field
+    });
+
     // Respond with success message
     return res.status(200).json({
       message: "OTP verified successfully and Member created in Memberstack.",
