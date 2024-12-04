@@ -8,7 +8,6 @@ const axios = require("axios");
 const app = express();
 
 // CORS configuration
-// CORS configuration
 const allowedOrigins = [
   "https://biaw-stage-api.webflow.io",
   "https://biaw-stage-api.webflow.io/signup",
@@ -122,13 +121,13 @@ app.post("/send-otp", async (req, res) => {
       to: email,
       subject: "Your OTP Code",
       text: `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, Please verify your email.
-            Your verification is below -- enter it in your open browser window and we'll get you signed in!\n\n
-             \n\nYour OTP code is: ${otp}\n\n
+       Your verification is below -- enter it in your open browser window and we'll get you signed in!\n\n
+       \n\nYour OTP code is: ${otp}\n\n
 
-              \n\nhttps://biaw-stage-api.webflow.io/account-verification\n\n
-              \n\nIf you didn’t request this email, there’s nothing to worry about — you can safely ignore it.\n\n
+       \n\nhttps://biaw-stage-api.webflow.io/account-verification\n\n
+       \n\nIf you didn’t request this email, there’s nothing to worry about — you can safely ignore it.\n\n
 
-             \n\nWelcome and thanks!.\n\n`,
+       \n\nWelcome and thanks!.\n\n`,
       html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
       <p>Thank you for joining! To finish signing up, Please verify your email.
       Your verification is below -- enter it in your open browser window and we'll get you signed in!</p>
@@ -161,7 +160,6 @@ app.post("/send-otp", async (req, res) => {
 });
 
 
-// Endpoint to verify OTP
 app.post("/verify-otp", async (req, res) => {
   const { email, otp } = req.body;
 
@@ -178,47 +176,91 @@ app.post("/verify-otp", async (req, res) => {
     }
 
     const record = records[0];
-    const { "First Name": firstName, "Last Name": lastName, "Company": company, "Membership Company ID": membershipCompanyId, "Member Type": memberType } = record.fields;
+    await base("Member and Non-member sign up details").update(record.id, {
+      "Verification Status": "Verified",
+    });
+
+    return res.status(200).json({
+      message: "OTP verified successfully.",
+      email, // Return email to the frontend for further steps
+    });
+  } catch (error) {
+    console.error("Error verifying OTP:", error.message);
+    res.status(500).json({
+      error: "Server error while verifying OTP.",
+      details: error.message,
+    });
+  }
+});
+
+app.post("/set-password", async (req, res) => {
+  const { password, confirmPassword, email } = req.body;
+
+  try {
+    if (!password || !confirmPassword || !email) {
+      return res.status(400).json({ error: "Password, Confirm Password, and Email are required." });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match." });
+    }
+
+    // Fetch the user record from Airtable
+    const records = await base("Member and Non-member sign up details")
+      .select({ filterByFormula: `{Email} = '${email}'` })
+      .firstPage();
+
+    if (records.length === 0) {
+      return res.status(404).json({ error: "User not found in Airtable." });
+    }
+
+    const record = records[0];
+    const {
+      "First Name": firstName,
+      "Last Name": lastName,
+      "Company": company,
+      "Membership Company ID": membershipCompanyId,
+      "Member Type": memberType,
+    } = record.fields;
 
     // Prepare data for Memberstack
     const memberData = {
       email,
-      password: "defaultPassword123", // Use a secure default or generated password
+      password,
       customFields: {
-        "first-name": firstName || "", // Default to empty string if undefined
+        "first-name": firstName || "",
         "last-name": lastName || "",
         company: company || "N/A",
-        "companyid": membershipCompanyId,// Default to "N/A" if no company provided
-        "mbr-type": memberType || "Standard", // Default to "Standard" if no member type provided
+        "companyid": membershipCompanyId || "",
+        "mbr-type": memberType || "Standard",
       },
     };
 
-    console.log("Data being sent to Memberstack:", memberData);
-
-    // Send data to Memberstack
+    // Call the Memberstack API
     const memberstackResponse = await createMemberInMemberstack(memberData);
 
-    console.log("Memberstack Response:", memberstackResponse);
+    if (memberstackResponse.error) {
+      throw new Error(memberstackResponse.error);
+    }
 
+    // Update Airtable with Memberstack Member ID
     await base("Member and Non-member sign up details").update(record.id, {
-      "Verification Status": "Verified", // Update the verification status field
-      "Member ID": memberstackResponse.data.id,       // Update the Member ID field
+      "Member ID": memberstackResponse.data.id,
     });
 
-    // Respond with success message
-    return res.status(200).json({
-      message: "OTP verified successfully and Member created in Memberstack.",
+    res.status(200).json({
+      message: "Member created successfully in Memberstack.",
       memberstackResponse,
     });
   } catch (error) {
-    console.error("Error verifying OTP or sending data to Memberstack:", error.response?.data || error.message);
-
+    console.error("Error in set-password:", error.message);
     res.status(500).json({
-      error: "Server error while verifying OTP.",
-      details: error.response?.data || error.message,
+      error: "Failed to create Memberstack member.",
+      details: error.message,
     });
   }
 });
+
 
 
 // Start server
