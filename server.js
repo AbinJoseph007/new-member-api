@@ -90,8 +90,8 @@ const createMemberInMemberstack = async (memberData) => {
 
 // Endpoint to send OTP
 app.post("/send-otp", async (req, res) => {
-  const { firstName, LastName, company, email, pin } = req.body;
-  const membershipCompanyId = pin || null;
+  const { firstName, LastName, company, email, Pin } = req.body;
+  const membershipCompanyId = Pin || null;
 
   const otp = generateOTP();
 
@@ -161,7 +161,7 @@ app.post("/send-otp", async (req, res) => {
 
 
 app.post("/verify-otp", async (req, res) => {
-  const { email, otp } = req.body;
+  const { email, otp ,memberType } = req.body;
 
   try {
     // Verify email and OTP in Airtable
@@ -183,6 +183,7 @@ app.post("/verify-otp", async (req, res) => {
     return res.status(200).json({
       message: "OTP verified successfully.",
       email, // Return email to the frontend for further steps
+      memberType
     });
   } catch (error) {
     console.error("Error verifying OTP:", error.message);
@@ -194,7 +195,7 @@ app.post("/verify-otp", async (req, res) => {
 });
 
 app.post("/set-password", async (req, res) => {
-  const { password, confirmPassword, email } = req.body;
+  const { password, confirmPassword, email ,memberType  } = req.body;
 
   try {
     if (!password || !confirmPassword || !email) {
@@ -220,7 +221,6 @@ app.post("/set-password", async (req, res) => {
       "Last Name": lastName,
       "Company": company,
       "Membership Company ID": membershipCompanyId,
-      "Member Type": memberType,
     } = record.fields;
 
     // Prepare data for Memberstack
@@ -264,7 +264,7 @@ app.post("/set-password", async (req, res) => {
 
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
