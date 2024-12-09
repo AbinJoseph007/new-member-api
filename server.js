@@ -88,25 +88,15 @@ const createMemberInMemberstack = async (memberData) => {
 };
 
 
-// Endpoint to send OTP
 app.post("/send-otp", async (req, res) => {
   const { firstName, LastName, company, email, Pin } = req.body;
   const membershipCompanyId = Pin || null;
 
   const otp = generateOTP();
+  let memberType = null;
 
   try {
-    // Check if email is already registered
-    const existingRecords = await base("Member and Non-member sign up details")
-      .select({ filterByFormula: `{Email} = "${email}"` })
-      .firstPage();
-
-    if (existingRecords.length > 0) {
-      return res.status(400).json({ error: "This email is already registered. Please use a different email." });
-    }
-
-    // Verify Company ID if provided
-    let memberType = null;
+    // If a membership company ID (Pin) is provided, check its validity
     if (membershipCompanyId) {
       memberType = await checkCompanyId(membershipCompanyId);
       if (!memberType) {
@@ -114,8 +104,45 @@ app.post("/send-otp", async (req, res) => {
       }
     }
 
+    // Check if email is already registered
+    const existingRecords = await base("Member and Non-member sign up details")
+      .select({ filterByFormula: `{Email} = "${email}"` })
+      .firstPage();
 
-    // Send OTP via email
+    if (existingRecords.length > 0) {
+      const existingRecord = existingRecords[0];
+      const verificationStatus = existingRecord.fields["Verification Status"];
+
+      // If Verification Status is empty or null, allow sending OTP again
+      if (!verificationStatus) {
+        // Update existing record with new OTP and Membership Company ID (Pin)
+        await base("Member and Non-member sign up details").update([
+          {
+            id: existingRecord.id,
+            fields: {
+              "Verification Code": otp,
+            },
+          },
+        ]);
+      } else {
+        // If Verification Status exists, return error message
+        return res.status(400).json({ error: "Email already verified or OTP already sent." });
+      }
+    } else {
+      // If email doesn't exist, proceed with creating a new record
+      await base("Member and Non-member sign up details").create([{
+        fields: {
+          "First Name": firstName,
+          "Last Name": LastName,
+          "Email": email,
+          "Company": company,
+          "Membership Company ID": membershipCompanyId, // Add Pin to Airtable
+          "Verification Code": otp,
+        },
+      }]);
+    }
+
+    // Send OTP via email (same logic for both updating and creating records)
     const mailOptions = {
       from: `"BIAW" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -138,26 +165,16 @@ app.post("/send-otp", async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    // Save data to Airtable without Member Type
-    await base("Member and Non-member sign up details").create([
-      {
-        fields: {
-          "First Name": firstName,
-          "Last Name": LastName,
-          "Email": email,
-          "Company": company,
-          "Membership Company ID": membershipCompanyId,
-          "Verification Code": otp,
-        },
-      },
-    ]);
+    // Return the response with memberType (if applicable)
+    res.status(200).json({ message: "OTP sent successfully", otp, memberType });
 
-    res.status(200).json({ message: "OTP sent successfully and data added to Airtable", otp, memberType });
   } catch (error) {
     console.error("Error sending OTP:", error);
     res.status(500).json({ error: "Failed to send OTP or add data to Airtable", details: error.message });
   }
 });
+
+
 
 
 app.post("/verify-otp", async (req, res) => {
@@ -174,11 +191,6 @@ app.post("/verify-otp", async (req, res) => {
     if (records.length === 0) {
       return res.status(400).json({ error: "Invalid email or OTP." });
     }
-
-    const record = records[0];
-    await base("Member and Non-member sign up details").update(record.id, {
-      "Verification Status": "Verified",
-    });
 
     return res.status(200).json({
       message: "OTP verified successfully.",
@@ -246,6 +258,7 @@ app.post("/set-password", async (req, res) => {
     // Update Airtable with Memberstack Member ID
     await base("Member and Non-member sign up details").update(record.id, {
       "Member ID": memberstackResponse.data.id,
+      "Verification Status": "Verified",
     });
 
     res.status(200).json({
