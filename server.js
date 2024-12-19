@@ -90,10 +90,10 @@ const createMemberInMemberstack = async (memberData) => {
 
 app.post("/send-otp", async (req, res) => {
   const { firstName, LastName, company, email, Pin } = req.body;
-  const membershipCompanyId = Pin || null;
+  const membershipCompanyId = Pin;
 
   const otp = generateOTP();
-  let memberType = null;
+  let memberType ="";
 
   try {
     // If a membership company ID (Pin) is provided, check its validity
@@ -244,7 +244,7 @@ app.post("/set-password", async (req, res) => {
         "last-name": lastName || "",
         company: company || "N/A",
         "companyid": membershipCompanyId || "",
-        "mbr-type": memberType || "Standard",
+        "mbr-type": memberType || "",
       },
     };
 
