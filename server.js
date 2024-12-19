@@ -121,6 +121,12 @@ app.post("/send-otp", async (req, res) => {
             id: existingRecord.id,
             fields: {
               "Verification Code": otp,
+
+              //new update
+              "First Name": firstName, // Update First Name
+              "Last Name": LastName,   // Update Last Name
+              "Company": company,      // Update Company
+              "Membership Company ID": membershipCompanyId, // Update Membership Company ID
             },
           },
         ]);
