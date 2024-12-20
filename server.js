@@ -280,6 +280,69 @@ app.post("/set-password", async (req, res) => {
   }
 });
 
+//memberid verification
+
+app.post("/update-company-id", async (req, res) => {
+  const { email, companyId } = req.body;
+
+  if (!email || !companyId) {
+    return res.status(400).json({ error: "Email and Company ID are required." });
+  }
+
+  try {
+    // Step 1: Check if Company ID exists in the "NAHB Data" table
+    const memberType = await checkCompanyId(companyId);
+    if (!memberType) {
+      return res.status(400).json({ error: "Invalid Company ID." });
+    }
+
+    // Step 2: Fetch user record from Airtable
+    const records = await base("Member and Non-member sign up details")
+      .select({ filterByFormula: `{Email} = '${email}'` })
+      .firstPage();
+
+    if (records.length === 0) {
+      return res.status(404).json({ error: "User not found in Airtable." });
+    }
+
+    const record = records[0];
+
+    // Step 3: Update Airtable
+    await base("Member and Non-member sign up details").update(record.id, {
+      "Membership Company ID": companyId,
+    });
+
+    // Step 4: Update Memberstack
+    const memberId = record.fields["Member ID"]; // Assuming Member ID exists
+    if (!memberId) {
+      return res.status(404).json({ error: "Member ID not found in Airtable." });
+    }
+
+    const memberstackUpdateUrl = `https://admin.memberstack.com/members/${memberId}`;
+    const headers = {
+      "X-API-KEY": process.env.MEMBERSTACK_API_KEY,
+      "Content-Type": "application/json",
+    };
+
+    await axios.patch(
+      memberstackUpdateUrl,
+      {
+        customFields: {
+          "companyid": companyId,
+          "mbr-type": memberType, // Optional: Update Member Type as well
+        },
+      },
+      { headers }
+    );
+
+    // Step 5: Send success response
+    res.status(200).json({ message: "Company ID updated successfully." });
+  } catch (error) {
+    console.error("Error updating Company ID:", error.message);
+    res.status(500).json({ error: "Failed to update Company ID.", details: error.message });
+  }
+});
+
 
 
 // Start server
