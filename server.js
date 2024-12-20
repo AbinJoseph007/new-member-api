@@ -335,6 +335,25 @@ app.post("/update-company-id", async (req, res) => {
       { headers }
     );
 
+     // Step 5: Fetch record from "Members" table and update with the new Company ID
+     const memberRecords = await base("Members")
+     .select({ filterByFormula: `{Email Address} = '${email}'` })
+     .firstPage();
+
+   if (memberRecords.length === 0) {
+     return res.status(404).json({ error: "Member not found in the 'Members' table." });
+   }
+
+   const memberRecord = memberRecords[0];
+
+   // Update the "Members" table with the new Company ID and User type
+   await base("Members").update(memberRecord.id, {
+     "Company ID Used": companyId, // Update "Company ID Used" field
+     "User": memberType, 
+     "UserType":"Member" // Optional: Update Member Type as well
+     // Update "User" field with member type
+   });
+
     // Step 5: Send success response
     res.status(200).json({ message: "Company ID updated successfully." });
   } catch (error) {
