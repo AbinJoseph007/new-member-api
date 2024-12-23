@@ -144,6 +144,7 @@ app.post("/send-otp", async (req, res) => {
           "Company": company,
           "Membership Company ID": membershipCompanyId, // Add Pin to Airtable
           "Verification Code": otp,
+          "Verification Status": "Not Verified"
         },
       }]);
     }
