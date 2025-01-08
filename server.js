@@ -393,7 +393,7 @@ const memberstackHeaders = {
 // Helper function to send email
 async function sendEmail(to, subject, text) {
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from:`"BIAW Support" <${process.env.EMAIL_USER}>`,
     to: to,
     subject: subject,
     text: text,
@@ -494,7 +494,7 @@ async function updateMemberstack(recordId, memberId, updateData) {
       // Check if email exists and send email
       if (email) {
         const emailSubject = 'Your Memberstack Account Has Been Updated';
-        const emailText = 'Hello, your Memberstack account has been successfully updated.';
+        const emailText = 'Hello, your Memberstack account has been successfully updated.\n\nYou are now a Director';
         await sendEmail(email, emailSubject, emailText);
       } else {
         console.error('Email address not found in updateData. Skipping email notification.');
