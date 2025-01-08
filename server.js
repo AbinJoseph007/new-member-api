@@ -525,7 +525,7 @@ async function updateAirtableAfterCreatingMember(recordId, memberId, email,clean
 
     // Send email after creating a new Director
     const emailSubject = 'Your Memberstack Account Has Been Created';
-    const emailText = `Hello ${firstName} ${lastName}\n\n your Memberstack Director account has been successfully created.\n\nHere are your account details: \n your Email: ${email}\n your password : ${cleanedPassword} `;
+    const emailText = `Hello ${firstName} ${lastName}\n\nyour Memberstack Director account has been successfully created.\n\nHere are your account details: \nyour Email: ${email}\nyour password : ${cleanedPassword} `;
     await sendEmail(email, emailSubject, emailText);
   } catch (error) {
     console.error('Error updating Airtable after creating Memberstack member:', error.response ? error.response.data : error.message);
