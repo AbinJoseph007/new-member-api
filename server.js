@@ -475,30 +475,38 @@ async function updateMemberstack(recordId, memberId, updateData) {
     console.log('Updating Memberstack member...', updateData);
     const response = await axios.patch(url, updateData, { headers: memberstackHeaders });
 
-    // Log the entire response body to verify its structure
     console.log('Full Memberstack member update response:', JSON.stringify(response.data, null, 2));
 
-    // Check if 'id' is located under a different key in the response data
     const updatedMemberId = response.data?.data?.id || null;
 
     if (updatedMemberId) {
       console.log('Successfully extracted updatedMemberId:', updatedMemberId);
 
-      // Proceed to update Airtable with the updatedMemberId
+      // Update Airtable after the Memberstack update
       await updateAirtableAfterUpdatingMember(recordId, updatedMemberId);
 
-      // Send email if the user is a Director
-      const emailSubject = 'Your Memberstack Account Has Been Updated';
-      const emailText = 'Hello, your Memberstack account has been successfully updated.';
-      await sendEmail(updateData.auth.email, emailSubject, emailText);
+      // Extract email from updateData
+      const email = updateData?.email || updateData?.auth?.email;
+
+      // Console log the email before sending
+      console.log(`Email extracted for notification: ${email}`);
+
+      // Check if email exists and send email
+      if (email) {
+        const emailSubject = 'Your Memberstack Account Has Been Updated';
+        const emailText = 'Hello, your Memberstack account has been successfully updated.';
+        await sendEmail(email, emailSubject, emailText);
+      } else {
+        console.error('Email address not found in updateData. Skipping email notification.');
+      }
     } else {
       console.error('Error: Updated Memberstack ID not found in response. Response did not contain id.');
     }
-
   } catch (error) {
     console.error('Error updating Memberstack member:', error.response ? error.response.data : error.message);
   }
 }
+
 
 // Update Airtable after creating a new Memberstack member
 async function updateAirtableAfterCreatingMember(recordId, memberId, email) {
