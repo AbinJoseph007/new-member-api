@@ -4,6 +4,8 @@ const cors = require("cors");
 require("dotenv").config();
 const Airtable = require("airtable");
 const axios = require("axios");
+const cron = require('node-cron');
+
 
 const app = express();
 
@@ -400,7 +402,6 @@ async function fetchAirtableRecords() {
 }
 
 // Check if Memberstack member exists by email
-// Check if Memberstack member exists by email
 async function checkMemberstackEmail(email) {
   try {
     console.log(`Checking Memberstack for email: ${email}`);
@@ -409,25 +410,22 @@ async function checkMemberstackEmail(email) {
       params: { email },
     });
 
-    // Log the full response to better understand the structure and confirm the presence of the email
     console.log('Memberstack email check response:', response.data);
 
-    // Check the response data for the member's email in the 'auth' field
-    const member = response.data.data?.find(m => m.auth?.email === email);  // Use `find` to match email
+    const member = response.data.data?.find(m => m.auth?.email === email);
 
     if (!member) {
       console.log(`No member found for email: ${email}`);
-      return null;  // If no member matches, return null
+      return null;  
     }
 
     console.log(`Found Memberstack member: ${member.auth.email}`);
-    return member.id;  // Return the ID of the found member
+    return member.id; 
   } catch (error) {
     console.error('Error checking Memberstack email:', error.response ? error.response.data : error.message);
     return null;
   }
 }
-
 
 // Create a new Memberstack member
 async function createMemberstackMember(newMemberData) {
@@ -443,16 +441,33 @@ async function createMemberstackMember(newMemberData) {
 }
 
 // Update Memberstack member details
-async function updateMemberstack(memberId, updateData) {
+async function updateMemberstack(recordId, memberId, updateData) {
   try {
+    console.log(`Updating Memberstack for memberId: ${memberId}`); 
     const url = `${MEMBERSTACK_URL}/${memberId}`;
     console.log('Updating Memberstack member...', updateData);
     const response = await axios.patch(url, updateData, { headers: memberstackHeaders });
-    console.log('Memberstack member updated:', response.data);
+
+    // Log the entire response body to verify its structure
+    console.log('Full Memberstack member update response:', JSON.stringify(response.data, null, 2));
+
+    // Check if 'id' is located under a different key in the response data
+    const updatedMemberId = response.data?.data?.id || null;
+
+    if (updatedMemberId) {
+      console.log('Successfully extracted updatedMemberId:', updatedMemberId);
+
+      // Proceed to update Airtable with the updatedMemberId
+      await updateAirtableAfterUpdatingMember(recordId, updatedMemberId);
+    } else {
+      console.error('Error: Updated Memberstack ID not found in response. Response did not contain id.');
+    }
+
   } catch (error) {
     console.error('Error updating Memberstack member:', error.response ? error.response.data : error.message);
   }
 }
+
 
 // Update Airtable after creating a new Memberstack member
 async function updateAirtableAfterCreatingMember(recordId, memberId, email) {
@@ -474,15 +489,26 @@ async function updateAirtableAfterCreatingMember(recordId, memberId, email) {
 }
 
 // Update Airtable after updating an existing Memberstack member
-async function updateAirtableAfterUpdatingMember(recordId) {
+async function updateAirtableAfterUpdatingMember(recordId, updatedMemberId) {
   try {
+    console.log('Updating Airtable with recordId:', recordId);
+    console.log('Updated Member ID:', updatedMemberId);
+
+    if (!updatedMemberId) {
+      console.error('Error: Cannot update Airtable because updatedMemberId is missing');
+      return;  
+    }
+
     const url = `${AIRTABLE_URL}/${recordId}`;
     const data = {
       fields: {
         'Create Account': 'Created/Updated',
+        'Member ID': updatedMemberId, 
       },
     };
-    console.log('Updating Airtable after updating Memberstack member...', data);
+
+    console.log('Data being sent to Airtable:', data);
+
     const response = await axios.patch(url, data, { headers: airtableHeaders });
     console.log('Airtable updated after updating Memberstack member:', response.data);
   } catch (error) {
@@ -501,9 +527,11 @@ async function processRecords() {
 
       console.log(`Processing record for email: ${email}`);
 
-      // Only process records marked for "Create/update"
       if (createAccount === 'Create/update') {
         let memberId = await checkMemberstackEmail(email);
+
+        // Log the memberId to verify it is correctly retrieved
+        console.log(`Retrieved memberId: ${memberId}`);
 
         const memberData = {
           customFields: {
@@ -517,14 +545,10 @@ async function processRecords() {
         };
 
         if (memberId) {
-          // Member exists, update Memberstack
           console.log(`Memberstack member found for ${email}. Updating...`);
-          await updateMemberstack(memberId, memberData);
+          await updateMemberstack(id, memberId, memberData); 
 
-          // Update Airtable after updating the existing Memberstack member
-          await updateAirtableAfterUpdatingMember(id);
         } else {
-          // Member does not exist, create new member
           console.log(`No Memberstack member found for ${email}. Creating new member...`);
           const newMember = await createMemberstackMember({ email, customFields: memberData.customFields });
 
@@ -540,8 +564,14 @@ async function processRecords() {
   }
 }
 
-// Execute the process
-processRecords();
+
+// Schedule a cron job to run every 30 seconds
+cron.schedule('*/30 * * * * *', () => {
+  console.log('Running scheduled task...');
+  processRecords();
+});
+
+console.log('Cron job started. Processing records every 30 seconds...');
 
 
 
