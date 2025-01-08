@@ -36,6 +36,7 @@ const AIRTABLE_TABLE_NAME = process.env.AIRTABLE_TABLE_NAME
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const MEMBERSTACK_API_KEY = process.env.MEMBERSTACK_API_KEY;
+const AIRTABLE_TABLE_NAME2 = process.env.AIRTABLE_TABLE_NAME2
 
 // Nodemailer transporter setup
 const transporter = nodemailer.createTransport({
@@ -239,7 +240,7 @@ app.post("/verify-otp", async (req, res) => {
 });
 
 app.post("/set-password", async (req, res) => {
-  const { password, confirmPassword, email, memberType } = req.body;
+  const { password, confirmPassword, email, memberType, membershipCompanyId } = req.body;
 
   try {
     if (!password || !confirmPassword || !email) {
@@ -264,7 +265,7 @@ app.post("/set-password", async (req, res) => {
       "First Name": firstName,
       "Last Name": lastName,
       "Company": company,
-      "Membership Company ID": membershipCompanyId,
+      "Membership Company ID": existingCompanyId,
     } = record.fields;
 
     // Prepare data for Memberstack
@@ -275,8 +276,8 @@ app.post("/set-password", async (req, res) => {
         "first-name": firstName || "",
         "last-name": lastName || "",
         company: company || "N/A",
-        "companyid": membershipCompanyId || "",
-        "mbr-type": memberType || "",
+        "companyid": membershipCompanyId || existingCompanyId || "",
+        "mbr-type": memberType || "Non-Member", // Default to Non-Member if not provided
         "director": "Non-Director",
       },
     };
@@ -294,13 +295,29 @@ app.post("/set-password", async (req, res) => {
       "Verification Status": "Verified",
     });
 
-    // Send a confirmation email
+    // Log the incoming values to verify correct behavior
+    console.log("membershipCompanyId:", membershipCompanyId);
+    console.log("memberType:", memberType);
+
+    // Determine the email content based on whether companyId and memberType are provided
+    let emailSubject = "Your Account Has Been Successfully Verified";
+    let emailText = `Dear ${firstName} ${lastName},\n\nCongratulations! Your account has been successfully Verified. We’re excited to have you as part of our community.\n\nYou can now log in using your email ${email} and explore all the features we offer. If you ever need any assistance or have any questions, feel free to reach out to our support team.\n\nThank you for joining us, and we look forward to providing you with an excellent experience!\n\nBest regards,\nBIAW Support Team`;
+    let emailHtml = `<p>Dear ${firstName} ${lastName},</p><p>Congratulations! Your account has been successfully Verified. We’re excited to have you as part of our community.</p><p>You can now log in using your email ${email} and explore all the features we offer. If you ever need any assistance or have any questions, feel free to reach out to our support team.</p><p>Thank you for joining us, and we look forward to providing you with an excellent experience!</p><p>Best regards,<br>BIAW Support Team</p>`;
+
+    // Check if either membershipCompanyId or memberType is not provided
+    if (!memberType) {
+      emailSubject = "Welcome to BIAW – Non-Member Registration";
+      emailText = `Dear ${firstName} ${lastName},\n\nnCongratulations! Your account has been successfully Verified ,You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: https://biaw-stage-api.webflow.io/reset-pin.\n\nIf you have any questions or need further assistance, feel free to reach out to our support team.\n\nBest regards,\nBIAW Support Team`;
+      emailHtml = `<p>Dear ${firstName} ${lastName},</p><p>You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: <a href="https://biaw-stage-api.webflow.io/reset-pin">Reset Your Company ID</a>.</p><p>If you have any questions or need further assistance, feel free to reach out to our support team.</p><p>Best regards,<br>BIAW Support Team</p>`;
+    }
+
+    // Send the confirmation email
     const mailOptions = {
       from: `"BIAW Support" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: "Your Account Has Been Successfully Verified",
-      text: `Dear ${firstName} ${lastName},\n\nCongratulations! Your account has been successfully Verified. We’re excited to have you as part of our community.\n\nYou can now log in using your email ${email} and explore all the features we offer. If you ever need any assistance or have any questions, feel free to reach out to our support team.\n\nThank you for joining us, and we look forward to providing you with an excellent experience!\n\nBest regards,\nBIAW Support Team`,
-      html: `<p>Dear ${firstName} ${lastName},</p><p>Congratulations! Your account has been successfully Verified. We’re excited to have you as part of our community.</p><p>You can now log in using your email ${email} and explore all the features we offer. If you ever need any assistance or have any questions, feel free to reach out to our support team.</p><p>Thank you for joining us, and we look forward to providing you with an excellent experience!</p><p>Best regards,<br>BIAW Support Team</p>`,
+      subject: emailSubject,
+      text: emailText,
+      html: emailHtml,
     };
 
     // Send the email
@@ -318,6 +335,7 @@ app.post("/set-password", async (req, res) => {
     });
   }
 });
+
 
 
 //memberid verification
@@ -402,6 +420,46 @@ app.post("/update-company-id", async (req, res) => {
   }
 });
 
+
+// Endpoint to handle form submission
+app.post('/submit', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    // Check Airtable for the email
+    const records = await base(AIRTABLE_TABLE_NAME2)
+      .select({ filterByFormula: `{Contact Email Address} = "${email}"` })
+      .firstPage();
+
+    if (records.length === 0) {
+      // Email not found in Airtable
+      await transporter.sendMail({
+        from: `"BIAW Support" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: 'Membership Information',
+        text: 'Your email is not matching any Company ID. You cannot be a member. Contact your local support \n\nIf you ever need any assistance or have any questions, feel free to reach out to our support team.\n\nBest regards,\nBIAW Support Team',
+      });
+      return res.status(200).json({ message: 'Email not found. Notification sent.' });
+    }
+
+    // Email found, get Company ID
+    const companyID = records[0].fields['Company ID'];
+    await transporter.sendMail({
+      from: `"BIAW Support" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your Company ID',
+      text: `Your Company ID is: ${companyID} \n\nIf you ever need any assistance or have any questions, feel free to reach out to our support team.\n\nBest regards,\nBIAW Support Team`,
+    });
+    res.status(200).json({ message: 'Company ID sent to the email.' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'An error occurred' });
+  }
+});
 
 
 // URLs and API keys
