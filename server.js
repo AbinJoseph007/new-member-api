@@ -159,7 +159,7 @@ app.post("/send-otp", async (req, res) => {
 
     // Send OTP via email (same logic for both updating and creating records)
     const mailOptions = {
-      from: `"BIAW" <${process.env.EMAIL_USER}>`,
+      from: `"BIAW Support" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Your OTP Code",
       text: `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, Please verify your email.
@@ -509,7 +509,7 @@ async function updateMemberstack(recordId, memberId, updateData) {
 
 
 // Update Airtable after creating a new Memberstack member
-async function updateAirtableAfterCreatingMember(recordId, memberId, email) {
+async function updateAirtableAfterCreatingMember(recordId, memberId, email,cleanedPassword ,firstName, lastName) {
   try {
     const url = `${AIRTABLE_URL}/${recordId}`;
     const data = {
@@ -525,7 +525,7 @@ async function updateAirtableAfterCreatingMember(recordId, memberId, email) {
 
     // Send email after creating a new Director
     const emailSubject = 'Your Memberstack Account Has Been Created';
-    const emailText = 'Hello, your Memberstack account has been successfully created.';
+    const emailText = `Hello ${firstName} ${lastName}\n\n your Memberstack Director account has been successfully created.\n\n your password${cleanedPassword} `;
     await sendEmail(email, emailSubject, emailText);
   } catch (error) {
     console.error('Error updating Airtable after creating Memberstack member:', error.response ? error.response.data : error.message);
@@ -614,7 +614,7 @@ async function processRecords() {
           // Ensure that we received a valid new member ID
           if (newMemberId) {
             // Update Airtable after creating the new Memberstack member
-            await updateAirtableAfterCreatingMember(id, newMemberId, email);
+            await updateAirtableAfterCreatingMember(id, newMemberId, email ,cleanedPassword ,firstName, lastName);
           } else {
             console.error('Failed to create new Memberstack member. Skipping Airtable update.');
           }
