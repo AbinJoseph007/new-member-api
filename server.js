@@ -372,17 +372,18 @@ app.post("/update-company-id", async (req, res) => {
 
 
 
-
+// URLs and API keys
 const AIRTABLE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}`;
 const MEMBERSTACK_URL = 'https://admin.memberstack.com/members';
 
+// Airtable and Memberstack headers
 const airtableHeaders = {
   Authorization: `Bearer ${AIRTABLE_API_KEY}`,
   'Content-Type': 'application/json',
 };
 
 const memberstackHeaders = {
-  "X-API-KEY": process.env.MEMBERSTACK_API_KEY,
+  'X-API-KEY': process.env.MEMBERSTACK_API_KEY,
   'Content-Type': 'application/json',
 };
 
@@ -390,151 +391,158 @@ const memberstackHeaders = {
 async function fetchAirtableRecords() {
   try {
     const response = await axios.get(AIRTABLE_URL, { headers: airtableHeaders });
+    console.log(`Fetched ${response.data.records.length} Airtable records`);
     return response.data.records;
   } catch (error) {
-    console.error('Error fetching Airtable records:', error);
+    console.error('Error fetching Airtable records:', error.response ? error.response.data : error.message);
     return [];
   }
 }
 
-// Check if the email exists in Memberstack and return the corresponding member ID
+// Check if Memberstack member exists by email
+// Check if Memberstack member exists by email
 async function checkMemberstackEmail(email) {
   try {
+    console.log(`Checking Memberstack for email: ${email}`);
     const response = await axios.get(MEMBERSTACK_URL, {
       headers: memberstackHeaders,
-      params: { email },  // This should return the member's ID if email is found
+      params: { email },
     });
 
-    console.log(`Memberstack response for email ${email}:`, response.data);  // Debugging line
+    // Log the full response to better understand the structure and confirm the presence of the email
+    console.log('Memberstack email check response:', response.data);
 
-    if (Array.isArray(response.data.members) && response.data.members.length > 0) {
-      return response.data.members[0].id;  // Return the member ID if found
+    // Check the response data for the member's email in the 'auth' field
+    const member = response.data.data?.find(m => m.auth?.email === email);  // Use `find` to match email
+
+    if (!member) {
+      console.log(`No member found for email: ${email}`);
+      return null;  // If no member matches, return null
     }
-    return null;  // Return null if the email is not found
+
+    console.log(`Found Memberstack member: ${member.auth.email}`);
+    return member.id;  // Return the ID of the found member
   } catch (error) {
-    console.error('Error checking Memberstack email:', error);
-    return null;  // Return null if there's an error in fetching member data
+    console.error('Error checking Memberstack email:', error.response ? error.response.data : error.message);
+    return null;
   }
 }
 
-// Update Memberstack member with the new field
-async function updateMemberstack(memberId, memberData) {
-  try {
-    const url = `https://admin.memberstack.com/members/${memberId}`;
-    const response = await axios.patch(url, memberData, { headers: memberstackHeaders });
-    return response.data;
-  } catch (error) {
-    console.error('Error updating Memberstack member:', error);
-    throw new Error('Failed to update Memberstack member');
-  }
-}
 
 // Create a new Memberstack member
-async function createMemberstack(memberData) {
+async function createMemberstackMember(newMemberData) {
   try {
-    const response = await axios.post(MEMBERSTACK_URL, memberData, { headers: memberstackHeaders });
+    console.log('Creating new Memberstack member...');
+    const response = await axios.post(MEMBERSTACK_URL, newMemberData, { headers: memberstackHeaders });
+    console.log('New Memberstack member created:', response.data);
     return response.data;
   } catch (error) {
-    if (error.response && error.response.data && error.response.data.code === 'email-already-in-use') {
-      console.error(`Email ${memberData.email} is already in use. Updating member instead.`);
-      return null;  // If email already exists, return null to update instead
-    }
-    console.error('Error creating Memberstack member:', error);
-    throw new Error('Failed to create Memberstack member');
+    console.error('Error creating Memberstack member:', error.response ? error.response.data : error.message);
+    throw error;
   }
 }
 
-// Update Airtable with Member ID
-async function updateAirtableRecord(recordId, memberId) {
+// Update Memberstack member details
+async function updateMemberstack(memberId, updateData) {
+  try {
+    const url = `${MEMBERSTACK_URL}/${memberId}`;
+    console.log('Updating Memberstack member...', updateData);
+    const response = await axios.patch(url, updateData, { headers: memberstackHeaders });
+    console.log('Memberstack member updated:', response.data);
+  } catch (error) {
+    console.error('Error updating Memberstack member:', error.response ? error.response.data : error.message);
+  }
+}
+
+// Update Airtable after creating a new Memberstack member
+async function updateAirtableAfterCreatingMember(recordId, memberId, email) {
   try {
     const url = `${AIRTABLE_URL}/${recordId}`;
     const data = {
       fields: {
-        'Member ID': memberId,  // Store the Memberstack ID in Airtable
-        'Create Account': 'Created/Updated',  // Mark as Created/Updated
+        'Member ID': memberId,
+        'Create Account': 'Created/Updated',
+        'Email': email,
       },
     };
-    await axios.patch(url, data, { headers: airtableHeaders });
+    console.log('Updating Airtable after creating Memberstack member...', data);
+    const response = await axios.patch(url, data, { headers: airtableHeaders });
+    console.log('Airtable updated after creating Memberstack member:', response.data);
   } catch (error) {
-    console.error('Error updating Airtable record:', error);
-    throw new Error('Failed to update Airtable record');
+    console.error('Error updating Airtable after creating Memberstack member:', error.response ? error.response.data : error.message);
   }
 }
 
-// Main process
+// Update Airtable after updating an existing Memberstack member
+async function updateAirtableAfterUpdatingMember(recordId) {
+  try {
+    const url = `${AIRTABLE_URL}/${recordId}`;
+    const data = {
+      fields: {
+        'Create Account': 'Created/Updated',
+      },
+    };
+    console.log('Updating Airtable after updating Memberstack member...', data);
+    const response = await axios.patch(url, data, { headers: airtableHeaders });
+    console.log('Airtable updated after updating Memberstack member:', response.data);
+  } catch (error) {
+    console.error('Error updating Airtable after updating Memberstack member:', error.response ? error.response.data : error.message);
+  }
+}
+
+// Main process to create or update Memberstack and update Airtable
 async function processRecords() {
   try {
     const records = await fetchAirtableRecords();
 
     for (const record of records) {
       const { id, fields } = record;
-      const { 'First Name': firstName, 'Last Name': lastName, Email: email, User, Password, 'Create Account': createAccount } = fields;
+      const { Email: email, 'First Name': firstName, 'Last Name': lastName, 'Company Name': companyName, 'Company ID': companyId, User, 'Create Account': createAccount } = fields;
 
-      // Process only if "Create Account" is set to 'Create/update'
+      console.log(`Processing record for email: ${email}`);
+
+      // Only process records marked for "Create/update"
       if (createAccount === 'Create/update') {
-        console.log(`Processing record for email: ${email}`);
+        let memberId = await checkMemberstackEmail(email);
 
-        // Check if the email already exists in Memberstack and get the member ID
-        const memberId = await checkMemberstackEmail(email);
-        console.log(`Memberstack memberId for email ${email}:`, memberId);
+        const memberData = {
+          customFields: {
+            'first-name': firstName || '',
+            'last-name': lastName || '',
+            company: companyName || '',
+            companyid: companyId || '',
+            director: 'Director',
+            'mbr-type': User || '',
+          },
+        };
 
         if (memberId) {
-          // If the member exists, update the Director field
-          const memberData = {
-            customFields: { director: 'Director' },
-          };
+          // Member exists, update Memberstack
+          console.log(`Memberstack member found for ${email}. Updating...`);
+          await updateMemberstack(memberId, memberData);
 
-          try {
-            const updatedMember = await updateMemberstack(memberId, memberData);
-            console.log(`Updated member: ${email} with ID ${updatedMember.id}`);
-
-            // Update Airtable with the new Member ID
-            await updateAirtableRecord(id, updatedMember.id);
-          } catch (error) {
-            console.error('Error updating existing member:', error);
-          }
+          // Update Airtable after updating the existing Memberstack member
+          await updateAirtableAfterUpdatingMember(id);
         } else {
-          console.log(`No member found for email ${email}. Creating new member...`);
+          // Member does not exist, create new member
+          console.log(`No Memberstack member found for ${email}. Creating new member...`);
+          const newMember = await createMemberstackMember({ email, customFields: memberData.customFields });
 
-          // If no member exists, create a new member in Memberstack
-          const newMemberData = {
-            email,
-            password: Password,  // Ensure Password is passed here from Airtable
-            customFields: {
-              "first-name": firstName || "",
-              "last-name": lastName || "",
-              company: fields['Company Name'] || "",  // Use Company Name if available
-              "companyid": fields['Company ID'] || "", // Use Company ID if available
-              "director": "Director",  // Mark as director
-              "mbr-type": User || "",
-            },
-          };
-
-          try {
-            const newMember = await createMemberstack(newMemberData);
-
-            if (newMember && newMember.data && newMember.data.id) {
-              const newMemberId = newMember.data.id;  // Get the ID from the response
-
-              // Update Airtable with the new member's ID and mark as "Created/Updated"
-              await updateAirtableRecord(id, newMemberId);
-              console.log(`Created new member: ${email} with ID ${newMemberId}`);
-            }
-          } catch (error) {
-            console.error('Error creating new member:', error);
-          }
+          // Update Airtable after creating the new Memberstack member
+          await updateAirtableAfterCreatingMember(id, newMember.id, email);
         }
       } else {
         console.log(`Skipping record for email: ${email} (Create Account is not 'Create/update')`);
       }
     }
   } catch (error) {
-    console.error('Error processing records:', error);
+    console.error('Error processing records:', error.response ? error.response.data : error.message);
   }
 }
 
 // Execute the process
 processRecords();
+
 
 
 // Start server
