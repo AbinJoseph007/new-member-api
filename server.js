@@ -525,7 +525,7 @@ async function updateAirtableAfterCreatingMember(recordId, memberId, email,clean
 
     // Send email after creating a new Director
     const emailSubject = 'Your Memberstack Account Has Been Created';
-    const emailText = `Hello ${firstName} ${lastName}\n\n your Memberstack Director account has been successfully created.\n\n your password : ${cleanedPassword} `;
+    const emailText = `Hello ${firstName} ${lastName}\n\n your Memberstack Director account has been successfully created.\n\nHere are your account details: \n your Email: ${email}\n your password : ${cleanedPassword} `;
     await sendEmail(email, emailSubject, emailText);
   } catch (error) {
     console.error('Error updating Airtable after creating Memberstack member:', error.response ? error.response.data : error.message);
@@ -567,38 +567,41 @@ async function processRecords() {
 
     for (const record of records) {
       const { id, fields } = record;
-      const { Email: email, 'First Name': firstName, 'Last Name': lastName, 'Company Name': companyName, 'Company ID': companyId, Password, User, 'Create Account': createAccount } = fields;
+      const {
+        Email: email,
+        'First Name': firstName,
+        'Last Name': lastName,
+        'Company Name': companyName,
+        'Company ID': companyId,
+        Password,
+        User,
+        'Create Account': createAccount,
+        Director, // This is the checkbox field
+      } = fields;
 
       console.log(`Processing record for email: ${email}`);
 
       if (createAccount === 'Create/update') {
         let memberId = await checkMemberstackEmail(email);
 
-        // Log the memberId to verify it is correctly retrieved
-        console.log(`Retrieved memberId: ${memberId}`);
-
         // Trim the password to remove any leading/trailing spaces
         const cleanedPassword = Password ? Password.trim() : '';
 
-        // Log the password length and value for debugging
-        console.log(`Password length: ${cleanedPassword.length}`);
-        console.log(`Password for ${email}: "${cleanedPassword}"`);
-
-        // Check if password is at least 8 characters long
+        // Skip if password is invalid
         if (!cleanedPassword || cleanedPassword.length < 8) {
           console.log(`Password for ${email} is invalid (must be at least 8 characters). Skipping...`);
-          continue; // Skip this record and move to the next
+          continue;
         }
 
         const memberData = {
           email,
-          password: cleanedPassword, // Ensure password is correctly assigned here
+          password: cleanedPassword,
           customFields: {
             "first-name": firstName || "",
             "last-name": lastName || "",
-            company: companyName || "",  // Use Company Name if available
-            "companyid": companyId || "", // Use Company ID if available
-            "director": "Director",  // Mark as director
+            company: companyName || "",
+            companyid: companyId || "",
+            director: Director ? "Director" : "Non-Director", // Set based on the Director checkbox
             "mbr-type": User || "",
           },
         };
@@ -606,15 +609,12 @@ async function processRecords() {
         if (memberId) {
           console.log(`Memberstack member found for ${email}. Updating...`);
           await updateMemberstack(id, memberId, memberData);
-
         } else {
           console.log(`No Memberstack member found for ${email}. Creating new member...`);
           const newMemberId = await createMemberstackMember({ email, password: cleanedPassword, customFields: memberData.customFields });
 
-          // Ensure that we received a valid new member ID
           if (newMemberId) {
-            // Update Airtable after creating the new Memberstack member
-            await updateAirtableAfterCreatingMember(id, newMemberId, email ,cleanedPassword ,firstName, lastName);
+            await updateAirtableAfterCreatingMember(id, newMemberId, email, cleanedPassword, firstName, lastName);
           } else {
             console.error('Failed to create new Memberstack member. Skipping Airtable update.');
           }
@@ -627,7 +627,6 @@ async function processRecords() {
     console.error('Error processing records:', error.response ? error.response.data : error.message);
   }
 }
-
 
 
 
