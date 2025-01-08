@@ -73,7 +73,7 @@ const checkCompanyId = async (companyId) => {
 const createMemberInMemberstack = async (memberData) => {
   const url = "https://admin.memberstack.com/members";
   const headers = {
-    "X-API-KEY": process.env.MEMBERSTACK_API_KEY, // Use the correct API key header
+    "X-API-KEY": process.env.MEMBERSTACK_API_KEY,
     "Content-Type": "application/json",
   };
 
@@ -101,10 +101,10 @@ app.post("/send-otp", async (req, res) => {
   const membershipCompanyId = Pin;
 
   const otp = generateOTP();
-  let memberType ="";
+  let memberType = "";
 
   try {
-    // If a membership company ID (Pin) is provided, check its validity
+    // Validate Membership Company ID (if provided)
     if (membershipCompanyId) {
       memberType = await checkCompanyId(membershipCompanyId);
       if (!memberType) {
@@ -112,77 +112,94 @@ app.post("/send-otp", async (req, res) => {
       }
     }
 
-    // Check if email is already registered
+    // Check if the email is already registered
     const existingRecords = await base("Member and Non-member sign up details")
-      .select({ filterByFormula: `{Email} = "${email}"` })
+      .select({ filterByFormula: `{Email} = "${email.replace(/"/g, '\\"')}"` })
       .firstPage();
 
+    // Define email content
+    let emailSubject = "Your OTP Code";
+    let emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, please verify your email.
+Your verification code is below. Enter it in your open browser window to complete the process.\n\n
+Your OTP code is: ${otp}\n\n
+https://biaw-stage-api.webflow.io/account-verification\n\n
+If you didn’t request this email, please ignore it.\n\n
+Welcome and thanks!\n\n`;
+
+    let emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
+<p>Thank you for joining! To finish signing up, please verify your email.</p>
+<p>Your verification code is: <strong>${otp}</strong></p>
+<p><a href="https://biaw-stage-api.webflow.io/account-verification">Complete Verification</a></p>
+<p>If you didn’t request this email, please ignore it.</p>
+<p>Welcome and thanks!</p>`;
+
+    // Handle existing records
     if (existingRecords.length > 0) {
       const existingRecord = existingRecords[0];
       const verificationStatus = existingRecord.fields["Verification Status"];
 
-      // If Verification Status is empty or null, allow sending OTP again
-      if (!verificationStatus) {
-        // Update existing record with new OTP and Membership Company ID (Pin)
+      if ( (!verificationStatus || verificationStatus === "Not Verified")) {
+        // Update the existing record with new OTP and user details
         await base("Member and Non-member sign up details").update([
           {
             id: existingRecord.id,
             fields: {
               "Verification Code": otp,
-
-              //new update
-              "First Name": firstName, // Update First Name
-              "Last Name": LastName,   // Update Last Name
-              "Company": company,      // Update Company
-              "Membership Company ID": membershipCompanyId, // Update Membership Company ID
+              "First Name": firstName,
+              "Last Name": LastName,
+              "Company": company,
+              "Membership Company ID": membershipCompanyId,
             },
           },
         ]);
+
+        // Update email content for users who already registered but are unverified
+        emailSubject = "Your Updated OTP Code";
+        emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nIt seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.\n\n
+Your new OTP code is: ${otp}\n\n
+https://biaw-stage-api.webflow.io/account-verification\n\n
+If you didn’t request this email, please ignore it.\n\n
+Welcome and thanks!\n\n`;
+
+        emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
+<p>It seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.</p>
+<p>Your new OTP code is: <strong>${otp}</strong></p>
+<p><a href="https://biaw-stage-api.webflow.io/account-verification">Complete Verification</a></p>
+<p>If you didn’t request this email, please ignore it.</p>
+<p>Welcome and thanks!</p>`;
       } else {
-        // If Verification Status exists, return error message
         return res.status(400).json({ error: "Email already verified or OTP already sent." });
       }
     } else {
-      // If email doesn't exist, proceed with creating a new record
-      await base("Member and Non-member sign up details").create([{
-        fields: {
-          "First Name": firstName,
-          "Last Name": LastName,
-          "Email": email,
-          "Company": company,
-          "Membership Company ID": membershipCompanyId, // Add Pin to Airtable
-          "Verification Code": otp,
-          "Verification Status": "Not Verified"
+      // Create a new record for first-time users
+      await base("Member and Non-member sign up details").create([
+        {
+          fields: {
+            "First Name": firstName,
+            "Last Name": LastName,
+            "Email": email,
+            "Company": company,
+            "Membership Company ID": membershipCompanyId,
+            "Verification Code": otp,
+            "Verification Status": "Not Verified",
+          },
         },
-      }]);
+      ]);
     }
 
-    // Send OTP via email (same logic for both updating and creating records)
+    // Send the email
     const mailOptions = {
       from: `"BIAW Support" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: "Your OTP Code",
-      text: `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, Please verify your email.
-       Your verification is below -- enter it in your open browser window and we'll get you signed in!\n\n
-       \n\nYour OTP code is: ${otp}\n\n
-
-       \n\nhttps://biaw-stage-api.webflow.io/account-verification\n\n
-       \n\nIf you didn’t request this email, there’s nothing to worry about — you can safely ignore it.\n\n
-
-       \n\nWelcome and thanks!.\n\n`,
-      html: `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
-      <p>Thank you for joining! To finish signing up, Please verify your email.
-      Your verification is below -- enter it in your open browser window and we'll get you signed in!</p>
-      <p>Your OTP code is: <strong>${otp}</strong></p>
-      <p><a href="https://biaw-stage-api.webflow.io/account-verification"></a></p>
-      <p>Please use this code to complete your verification.</p>`,
+      subject: emailSubject,
+      text: emailText,
+      html: emailHtml,
     };
 
     await transporter.sendMail(mailOptions);
 
-    // Return the response with memberType (if applicable)
+    // Return success response
     res.status(200).json({ message: "OTP sent successfully", otp, memberType });
-
   } catch (error) {
     console.error("Error sending OTP:", error);
     res.status(500).json({ error: "Failed to send OTP or add data to Airtable", details: error.message });
@@ -193,7 +210,7 @@ app.post("/send-otp", async (req, res) => {
 
 
 app.post("/verify-otp", async (req, res) => {
-  const { email, otp ,memberType } = req.body;
+  const { email, otp, memberType } = req.body;
 
   try {
     // Verify email and OTP in Airtable
@@ -222,7 +239,7 @@ app.post("/verify-otp", async (req, res) => {
 });
 
 app.post("/set-password", async (req, res) => {
-  const { password, confirmPassword, email ,memberType  } = req.body;
+  const { password, confirmPassword, email, memberType } = req.body;
 
   try {
     if (!password || !confirmPassword || !email) {
@@ -277,18 +294,31 @@ app.post("/set-password", async (req, res) => {
       "Verification Status": "Verified",
     });
 
+    // Send a confirmation email
+    const mailOptions = {
+      from: `"BIAW Support" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Your Account Has Been Successfully Verified",
+      text: `Dear ${firstName} ${lastName},\n\nCongratulations! Your account has been successfully Verified. We’re excited to have you as part of our community.\n\nYou can now log in using your email ${email} and explore all the features we offer. If you ever need any assistance or have any questions, feel free to reach out to our support team.\n\nThank you for joining us, and we look forward to providing you with an excellent experience!\n\nBest regards,\nBIAW Support Team`,
+      html: `<p>Dear ${firstName} ${lastName},</p><p>Congratulations! Your account has been successfully Verified. We’re excited to have you as part of our community.</p><p>You can now log in using your email ${email} and explore all the features we offer. If you ever need any assistance or have any questions, feel free to reach out to our support team.</p><p>Thank you for joining us, and we look forward to providing you with an excellent experience!</p><p>Best regards,<br>BIAW Support Team</p>`,
+    };
+
+    // Send the email
+    await transporter.sendMail(mailOptions);
+
     res.status(200).json({
-      message: "Member created successfully in Memberstack.",
+      message: "Member created successfully in Memberstack, and email sent.",
       memberstackResponse,
     });
   } catch (error) {
     console.error("Error in set-password:", error.message);
     res.status(500).json({
-      error: "Failed to create Memberstack member.",
+      error: "Failed to create Memberstack member and send email.",
       details: error.message,
     });
   }
 });
+
 
 //memberid verification
 
@@ -323,7 +353,7 @@ app.post("/update-company-id", async (req, res) => {
     });
 
     // Step 4: Update Memberstack
-    const memberId = record.fields["Member ID"]; // Assuming Member ID exists
+    const memberId = record.fields["Member ID"]; 
     if (!memberId) {
       return res.status(404).json({ error: "Member ID not found in Airtable." });
     }
@@ -339,30 +369,30 @@ app.post("/update-company-id", async (req, res) => {
       {
         customFields: {
           "companyid": companyId,
-          "mbr-type": memberType, // Optional: Update Member Type as well
+          "mbr-type": memberType, 
         },
       },
       { headers }
     );
 
-     // Step 5: Fetch record from "Members" table and update with the new Company ID
-     const memberRecords = await base("Members")
-     .select({ filterByFormula: `{Email Address} = '${email}'` })
-     .firstPage();
+    // Step 5: Fetch record from "Members" table and update with the new Company ID
+    const memberRecords = await base("Members")
+      .select({ filterByFormula: `{Email Address} = '${email}'` })
+      .firstPage();
 
-   if (memberRecords.length === 0) {
-     return res.status(404).json({ error: "Member not found in the 'Members' table." });
-   }
+    if (memberRecords.length === 0) {
+      return res.status(404).json({ error: "Member not found in the 'Members' table." });
+    }
 
-   const memberRecord = memberRecords[0];
+    const memberRecord = memberRecords[0];
 
-   // Update the "Members" table with the new Company ID and User type
-   await base("Members").update(memberRecord.id, {
-     "Company ID Used": companyId, // Update "Company ID Used" field
-     "User": memberType, 
-     "UserType":"Member" // Optional: Update Member Type as well
-     // Update "User" field with member type
-   });
+    // Update the "Members" table with the new Company ID and User type
+    await base("Members").update(memberRecord.id, {
+      "Company ID Used": companyId, 
+      "User": memberType,
+      "UserType": "Member" 
+      
+    });
 
     // Step 5: Send success response
     res.status(200).json({ message: "Company ID updated successfully." });
@@ -393,7 +423,7 @@ const memberstackHeaders = {
 // Helper function to send email
 async function sendEmail(to, subject, text) {
   const mailOptions = {
-    from:`"BIAW Support" <${process.env.EMAIL_USER}>`,
+    from: `"BIAW Support" <${process.env.EMAIL_USER}>`,
     to: to,
     subject: subject,
     text: text,
@@ -434,11 +464,11 @@ async function checkMemberstackEmail(email) {
 
     if (!member) {
       console.log(`No member found for email: ${email}`);
-      return null;  
+      return null;
     }
 
     console.log(`Found Memberstack member: ${member.auth.email}`);
-    return member.id; 
+    return member.id;
   } catch (error) {
     console.error('Error checking Memberstack email:', error.response ? error.response.data : error.message);
     return null;
@@ -470,7 +500,7 @@ async function createMemberstackMember(newMemberData) {
 // Update Memberstack member details
 async function updateMemberstack(recordId, memberId, updateData) {
   try {
-    console.log(`Updating Memberstack for memberId: ${memberId}`); 
+    console.log(`Updating Memberstack for memberId: ${memberId}`);
     const url = `${MEMBERSTACK_URL}/${memberId}`;
     console.log('Updating Memberstack member...', updateData);
     const response = await axios.patch(url, updateData, { headers: memberstackHeaders });
@@ -509,7 +539,7 @@ async function updateMemberstack(recordId, memberId, updateData) {
 
 
 // Update Airtable after creating a new Memberstack member
-async function updateAirtableAfterCreatingMember(recordId, memberId, email,cleanedPassword ,firstName, lastName) {
+async function updateAirtableAfterCreatingMember(recordId, memberId, email, cleanedPassword, firstName, lastName) {
   try {
     const url = `${AIRTABLE_URL}/${recordId}`;
     const data = {
@@ -540,14 +570,14 @@ async function updateAirtableAfterUpdatingMember(recordId, updatedMemberId) {
 
     if (!updatedMemberId) {
       console.error('Error: Cannot update Airtable because updatedMemberId is missing');
-      return;  
+      return;
     }
 
     const url = `${AIRTABLE_URL}/${recordId}`;
     const data = {
       fields: {
         'Create Account': 'Created/Updated',
-        'Member ID': updatedMemberId, 
+        'Member ID': updatedMemberId,
       },
     };
 
