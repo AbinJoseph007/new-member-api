@@ -632,7 +632,7 @@ async function processRecords() {
 
 
 // Schedule a cron job to run every 30 seconds
-cron.schedule('*/40 * * * * *', () => {
+cron.schedule('*/50 * * * * *', () => {
   console.log('Running scheduled task...');
   processRecords();
 });
