@@ -339,6 +339,44 @@ app.post("/set-password", async (req, res) => {
 
 //memberid verification
 
+async function checkCompanyIds(companyId) {
+  const records = await base("NAHB Data")
+    .select({ filterByFormula: `{Company ID} = '${companyId}'` })
+    .firstPage();
+
+  if (records.length === 0) {
+    return null;
+  }
+
+  if (records.length > 1) {
+    const values = records.map(record => record.fields["Member Type"]);
+    return { values, selected: values[0] }; // Default to the first value
+  }
+
+  return { values: [records[0].fields["Member Type"]], selected: records[0].fields["Member Type"] };
+}
+
+// Helper: Send Email Notification
+async function sendNotificationEmail(email, companyId, values, selectedValue) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: "abinjosephonline.in@gmail.com",
+    subject: "Company ID Value Selection",
+    text: `The Company ID ${companyId} has multiple values: ${values.join(", ")}. We selected "${selectedValue}".`,
+  };
+
+  await transporter.sendMail(mailOptions);
+}
+
+// Main Route: Update Company ID
 app.post("/update-company-id", async (req, res) => {
   const { email, companyId } = req.body;
 
@@ -347,30 +385,39 @@ app.post("/update-company-id", async (req, res) => {
   }
 
   try {
-    // Step 1: Check if Company ID exists in the "NAHB Data" table
-    const memberType = await checkCompanyId(companyId);
-    if (!memberType) {
+    // Step 1: Check if Company ID exists and fetch member type(s)
+    const companyData = await checkCompanyIds(companyId);
+    if (!companyData) {
       return res.status(400).json({ error: "Invalid Company ID." });
     }
 
+    const { values, selected } = companyData;
+
+    // If multiple values are found, send an email notification
+    if (values.length > 1) {
+      await sendNotificationEmail(email, companyId, values, selected);
+    }
+
+    const memberType = selected;
+
     // Step 2: Fetch user record from Airtable
-    const records = await base("Member and Non-member sign up details")
+    const userRecords = await base("Member and Non-member sign up details")
       .select({ filterByFormula: `{Email} = '${email}'` })
       .firstPage();
 
-    if (records.length === 0) {
+    if (userRecords.length === 0) {
       return res.status(404).json({ error: "User not found in Airtable." });
     }
 
-    const record = records[0];
+    const userRecord = userRecords[0];
 
     // Step 3: Update Airtable
-    await base("Member and Non-member sign up details").update(record.id, {
+    await base("Member and Non-member sign up details").update(userRecord.id, {
       "Membership Company ID": companyId,
     });
 
     // Step 4: Update Memberstack
-    const memberId = record.fields["Member ID"]; 
+    const memberId = userRecord.fields["Member ID"];
     if (!memberId) {
       return res.status(404).json({ error: "Member ID not found in Airtable." });
     }
@@ -385,14 +432,14 @@ app.post("/update-company-id", async (req, res) => {
       memberstackUpdateUrl,
       {
         customFields: {
-          "companyid": companyId,
-          "mbr-type": memberType, 
+          companyid: companyId,
+          "mbr-type": memberType,
         },
       },
       { headers }
     );
 
-    // Step 5: Fetch record from "Members" table and update with the new Company ID
+    // Step 5: Fetch and update the "Members" table
     const memberRecords = await base("Members")
       .select({ filterByFormula: `{Email Address} = '${email}'` })
       .firstPage();
@@ -402,16 +449,13 @@ app.post("/update-company-id", async (req, res) => {
     }
 
     const memberRecord = memberRecords[0];
-
-    // Update the "Members" table with the new Company ID and User type
     await base("Members").update(memberRecord.id, {
-      "Company ID Used": companyId, 
+      "Company ID Used": companyId,
       "User": memberType,
-      "UserType": "Member" 
-      
+      "UserType": "Member",
     });
 
-    // Step 5: Send success response
+    // Step 6: Send success response
     res.status(200).json({ message: "Company ID updated successfully." });
   } catch (error) {
     console.error("Error updating Company ID:", error.message);
@@ -420,7 +464,7 @@ app.post("/update-company-id", async (req, res) => {
 });
 
 
-// Endpoint to handle form submission
+// Endpoint to handle form submission for member id
 app.post('/submit', async (req, res) => {
   const { email } = req.body;
 
