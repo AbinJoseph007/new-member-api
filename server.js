@@ -305,7 +305,7 @@ app.post("/set-password", async (req, res) => {
     if (!memberType) {
       emailSubject = "Welcome to BIAW – Non-Member Registration";
       emailText = `Dear ${firstName} ${lastName},\n\nCongratulations! Your account has been successfully Verified ,You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: https://biaw-stage-api.webflow.io/reset-pin.\n\nIf you have any questions or need further assistance, feel free to reach out to our support team.\n\nBest regards,\nBIAW Support Team`;
-      emailHtml = `<p>Dear ${firstName} ${lastName},</p><p>You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: <a href="https://biaw-stage-api.webflow.io/reset-pin">Reset Your Company ID</a>.</p><p>If you have any questions or need further assistance, feel free to reach out to our support team.</p><p>Best regards,<br>BIAW Support Team</p>`;
+      emailHtml = `<p>Dear ${firstName} ${lastName},</p><p>Congratulations! Your account has been successfully Verified. You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: <a href="https://biaw-stage-api.webflow.io/reset-pin">Reset Your Company ID</a>.</p><p>If you have any questions or need further assistance, feel free to reach out to our support team.</p><p>Best regards,<br>BIAW Support Team</p>`;
     }
 
     // Send the confirmation email
