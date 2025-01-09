@@ -158,14 +158,12 @@ Welcome and thanks!\n\n`;
         emailSubject = "Your Updated OTP Code";
         emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nIt seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.\n\n
 Your new OTP code is: ${otp}\n\n
-https://biaw-stage-api.webflow.io/account-verification\n\n
 If you didn’t request this email, please ignore it.\n\n
 Welcome and thanks!\n\n`;
 
         emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
 <p>It seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.</p>
 <p>Your new OTP code is: <strong>${otp}</strong></p>
-<p><a href="https://biaw-stage-api.webflow.io/account-verification">Complete Verification</a></p>
 <p>If you didn’t request this email, please ignore it.</p>
 <p>Welcome and thanks!</p>`;
       } else {
