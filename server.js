@@ -623,7 +623,7 @@ async function updateMemberstack(recordId, memberId, updateData) {
       // Check if email exists and send email
       if (email) {
         const emailSubject = 'Your Memberstack Account Has Been Updated';
-        const emailText = 'Hello, your Memberstack account has been successfully updated.\n\nYou are now a Director';
+        const emailText = 'Hello, your Memberstack account has been successfully updated.';
         await sendEmail(email, emailSubject, emailText);
       } else {
         console.error('Email address not found in updateData. Skipping email notification.');
