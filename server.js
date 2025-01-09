@@ -370,7 +370,7 @@ async function sendNotificationEmail(email, companyId, values, selectedValue) {
     from: process.env.EMAIL_USER,
     to: "abinjosephonline.in@gmail.com",
     subject: "Company ID Value Selection",
-    text: `The Company ID ${companyId} has multiple values: ${values.join(", ")}. We selected "${selectedValue}".`,
+    text: `the person with email:${email} have applied with The Company ID ${companyId} has multiple values: ${values.join(", ")}. We selected "${selectedValue}".`,
   };
 
   await transporter.sendMail(mailOptions);
