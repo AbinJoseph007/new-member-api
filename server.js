@@ -276,7 +276,7 @@ app.post("/set-password", async (req, res) => {
         "last-name": lastName || "",
         company: company || "N/A",
         "companyid": membershipCompanyId || existingCompanyId || "",
-        "mbr-type": memberType || "Non-Member", // Default to Non-Member if not provided
+        "mbr-type": memberType || "", // Default to Non-Member if not provided
         "director": "Non-Director",
       },
     };
