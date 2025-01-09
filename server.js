@@ -123,14 +123,12 @@ app.post("/send-otp", async (req, res) => {
     let emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, please verify your email.
 Your verification code is below. Enter it in your open browser window to complete the process.\n\n
 Your OTP code is: ${otp}\n\n
-https://biaw-stage-api.webflow.io/account-verification\n\n
 If you didn’t request this email, please ignore it.\n\n
 Welcome and thanks!\n\n`;
 
     let emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
 <p>Thank you for joining! To finish signing up, please verify your email.</p>
 <p>Your verification code is: <strong>${otp}</strong></p>
-<p><a href="https://biaw-stage-api.webflow.io/account-verification">Complete Verification</a></p>
 <p>If you didn’t request this email, please ignore it.</p>
 <p>Welcome and thanks!</p>`;
 
@@ -306,7 +304,7 @@ app.post("/set-password", async (req, res) => {
     // Check if either membershipCompanyId or memberType is not provided
     if (!memberType) {
       emailSubject = "Welcome to BIAW – Non-Member Registration";
-      emailText = `Dear ${firstName} ${lastName},\n\nnCongratulations! Your account has been successfully Verified ,You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: https://biaw-stage-api.webflow.io/reset-pin.\n\nIf you have any questions or need further assistance, feel free to reach out to our support team.\n\nBest regards,\nBIAW Support Team`;
+      emailText = `Dear ${firstName} ${lastName},\n\nCongratulations! Your account has been successfully Verified ,You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: https://biaw-stage-api.webflow.io/reset-pin.\n\nIf you have any questions or need further assistance, feel free to reach out to our support team.\n\nBest regards,\nBIAW Support Team`;
       emailHtml = `<p>Dear ${firstName} ${lastName},</p><p>You are signed up as a non-member. If you have a company ID or would like to upgrade your non-member status to a member, please visit this page to update your information: <a href="https://biaw-stage-api.webflow.io/reset-pin">Reset Your Company ID</a>.</p><p>If you have any questions or need further assistance, feel free to reach out to our support team.</p><p>Best regards,<br>BIAW Support Team</p>`;
     }
 
