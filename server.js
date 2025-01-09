@@ -156,16 +156,17 @@ Welcome and thanks!\n\n`;
 
         // Update email content for users who already registered but are unverified
         emailSubject = "Your Updated OTP Code";
-        emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nIt seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.\n\n
+emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nIt seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.\n\n
 Your new OTP code is: ${otp}\n\n
 If you didn’t request this email, please ignore it.\n\n
 Welcome and thanks!\n\n`;
 
-        emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
+emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
 <p>It seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.</p>
 <p>Your new OTP code is: <strong>${otp}</strong></p>
 <p>If you didn’t request this email, please ignore it.</p>
 <p>Welcome and thanks!</p>`;
+
       } else {
         return res.status(400).json({ error: "Email already verified or OTP already sent." });
       }
