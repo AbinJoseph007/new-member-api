@@ -759,13 +759,15 @@ async function processRecords() {
 
 
 
-// Schedule a cron job to run every 30 seconds
-cron.schedule('*/50 * * * * *', () => {
-  console.log('Running scheduled task...');
-  processRecords();
-});
+async function runPeriodicallys(intervalMs) {
+  console.log("Starting periodic sync...");
+  setInterval(async () => {
+    console.log(`Running sync at ${new Date().toISOString()}`);
+    await processRecords();
+  }, intervalMs);
+}
 
-console.log('Cron job started. Processing records every 30 seconds...');
+runPeriodicallys(20 * 1000);
 
 
 
