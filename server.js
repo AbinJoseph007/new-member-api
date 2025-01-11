@@ -118,29 +118,31 @@ app.post("/send-otp", async (req, res) => {
       .select({ filterByFormula: `{Email} = "${email.replace(/"/g, '\\"')}"` })
       .firstPage();
 
-    // Define email content
-    let emailSubject = "Your OTP Code";
-    let emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, please verify your email.
-Your verification code is below. Enter it in your open browser window to complete the process.\n\n
-Your OTP code is: ${otp}\n\n
-If you didn’t request this email, please ignore it.\n\n
-Welcome and thanks!\n\n`;
-
-    let emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
-<p>Thank you for joining! To finish signing up, please verify your email.</p>
-<p>Your verification code is: <strong>${otp}</strong></p>
-<p>If you didn’t request this email, please ignore it.</p>
-<p>Welcome and thanks!</p>`;
-
-    // Handle existing records
-    if (existingRecords.length > 0) {
-      const existingRecord = existingRecords[0];
-      const verificationStatus = existingRecord.fields["Verification Status"];
-
-      if ( (!verificationStatus || verificationStatus === "Not Verified")) {
-        // Update the existing record with new OTP and user details
-        await base("Member and Non-member sign up details").update([
-          {
+      let emailSubject = "Your OTP Code";
+      let emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nThank you for joining! To finish signing up, please verify your email.
+      Your verification code is below. Enter it in your open browser window to complete the process.\n\n
+      Your OTP code is: ${otp}\n\n
+      To complete your verification, please click the following link:\n\n
+      https://biaw-stage-api.webflow.io/account-verification?email=${encodeURIComponent(email)}&memberType=${encodeURIComponent(memberType)}\n\n
+      If you didn’t request this email, please ignore it.\n\n
+      Welcome and thanks!\n\n`;
+      
+      let emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
+      <p>Thank you for joining! To finish signing up, please verify your email.</p>
+      <p>Your verification code is: <strong>${otp}</strong></p>
+      <p>To complete your verification, please click the link below:</p>
+      <p><a href="https://biaw-stage-api.webflow.io/account-verification?email=${encodeURIComponent(email)}&memberType=${encodeURIComponent(memberType)}">Click here to verify your email</a></p>
+      <p>If you didn’t request this email, please ignore it.</p>
+      <p>Welcome and thanks!</p>`;
+      
+      // Handle existing records
+      if (existingRecords.length > 0) {
+        const existingRecord = existingRecords[0];
+        const verificationStatus = existingRecord.fields["Verification Status"];
+      
+        if ((!verificationStatus || verificationStatus === "Not Verified")) {
+          // Update the existing record with new OTP and user details
+          await base("Member and Non-member sign up details").update([{
             id: existingRecord.id,
             fields: {
               "Verification Code": otp,
@@ -149,25 +151,28 @@ Welcome and thanks!\n\n`;
               "Company": company,
               "Membership Company ID": membershipCompanyId,
             },
-          },
-        ]);
-
-        // Update email content for users who already registered but are unverified
-        emailSubject = "Your Updated OTP Code";
-emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nIt seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.\n\n
-Your new OTP code is: ${otp}\n\n
-If you didn’t request this email, please ignore it.\n\n
-Welcome and thanks!\n\n`;
-
-emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
-<p>It seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.</p>
-<p>Your new OTP code is: <strong>${otp}</strong></p>
-<p>If you didn’t request this email, please ignore it.</p>
-<p>Welcome and thanks!</p>`;
-
-      } else {
-        return res.status(400).json({ error: "Email already verified or OTP already sent." });
-      }
+          }]);
+      
+          // Update email content for users who already registered but are unverified
+          emailSubject = "Your Updated OTP Code";
+          emailText = `Hello ${firstName || "User"} ${LastName || ""},\n\nIt seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.\n\n
+      Your new OTP code is: ${otp}\n\n
+      To complete your verification, please click the following link:\n\n
+      https://biaw-stage-api.webflow.io/account-verification?email=${encodeURIComponent(email)}&memberType=${encodeURIComponent(memberType)}\n\n
+      If you didn’t request this email, please ignore it.\n\n
+      Welcome and thanks!\n\n`;
+      
+          emailHtml = `<p>Hello ${firstName || "User"} ${LastName || ""},</p>
+      <p>It seems you've already tried to register with us but didn't complete the verification process. No worries! We've generated a new OTP for you to complete your registration.</p>
+      <p>Your new OTP code is: <strong>${otp}</strong></p>
+      <p>To complete your verification, please click the link below:</p>
+      <p><a href="https://biaw-stage-api.webflow.io/account-verification?email=${encodeURIComponent(email)}&memberType=${encodeURIComponent(memberType)}">Click here to verify your email</a></p>
+      <p>If you didn’t request this email, please ignore it.</p>
+      <p>Welcome and thanks!</p>`;
+      
+        } else {
+          return res.status(400).json({ error: "Email already verified or OTP already sent." });
+        }
     } else {
       // Create a new record for first-time users
       await base("Member and Non-member sign up details").create([
