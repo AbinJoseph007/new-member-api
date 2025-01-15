@@ -886,7 +886,7 @@ processRecords();
 runPeriodicallySync(40 * 1000);
 
 // Run the update process (every 15 minutes)
-runPeriodicUpdate(2 * 60 * 1000);
+runPeriodicUpdate(1 * 60 * 1000);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
