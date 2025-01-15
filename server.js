@@ -36,7 +36,8 @@ const AIRTABLE_TABLE_NAME = process.env.AIRTABLE_TABLE_NAME
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const MEMBERSTACK_API_KEY = process.env.MEMBERSTACK_API_KEY;
-const AIRTABLE_TABLE_NAME2 = process.env.AIRTABLE_TABLE_NAME2
+const AIRTABLE_TABLE_NAME2 = process.env.AIRTABLE_TABLE_NAME2;
+const AIRTABLE_TABLE_NAME3 = process.env.AIRTABLE_TABLE_NAME3
 
 // Nodemailer transporter setup
 const transporter = nodemailer.createTransport({
@@ -456,6 +457,7 @@ app.post("/update-company-id", async (req, res) => {
       "Company ID Used": companyId,
       "User": memberType,
       "UserType": "Member",
+      "Membership Update Status":"Updated"
     });
 
     // Step 6: Send success response
@@ -764,20 +766,128 @@ async function processRecords() {
 
 
 
-async function runPeriodicallys(intervalMs) {
+// async function runPeriodicallys(intervalMs) {
+//   console.log("Starting periodic sync...");
+//   setInterval(async () => {
+//     console.log(`Running sync at ${new Date().toISOString()}`);
+//     await processRecords();
+//   }, intervalMs);
+// }
+
+// runPeriodicallys(20 * 1000);
+
+
+const AIRTABLE_URL2 = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME3}`;
+
+// Fetch records from Airtable
+async function fetchUpdatedAirtableRecords() {
+  try {
+    const response = await axios.get(AIRTABLE_URL2, { headers: airtableHeaders });
+    const records = response.data.records.filter(
+      (record) => record.fields['Membership Update Status'] === 'Membership update status'
+    );
+    console.log(`Fetched ${records.length} records to update.`);
+    return records;
+  } catch (error) {
+    console.error('Error fetching Airtable records:', error.response?.data || error.message);
+    return [];
+  }
+}
+
+// Update Memberstack member details
+async function updateMemberstackDetails(userId, memberUpdateData) {
+  try {
+    console.log(`Updating Memberstack member ${userId}...`);
+    const response = await axios.patch(`${MEMBERSTACK_URL}/${userId}`, memberUpdateData, {
+      headers: memberstackHeaders,
+    });
+    console.log(`Memberstack member ${userId} updated successfully.`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating Memberstack member ${userId}:`, error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// Update Airtable record after Memberstack update
+async function updateAirtableRecord(recordId) {
+  try {
+    const url = `${AIRTABLE_URL2}/${recordId}`;
+    const data = {
+      fields: {
+        'Membership Update Status': 'Updated',
+      },
+    };
+    console.log(`Updating Airtable record ${recordId}...`);
+    const response = await axios.patch(url, data, { headers: airtableHeaders });
+    console.log(`Airtable record ${recordId} updated successfully.`);
+  } catch (error) {
+    console.error(`Error updating Airtable record ${recordId}:`, error.response?.data || error.message);
+  }
+}
+
+// Process and update records
+async function processAndUpdateRecords() {
+  try {
+    const records = await fetchUpdatedAirtableRecords();
+
+    for (const record of records) {
+      const { id: recordId, fields } = record;
+      const userId = fields['Member ID']; // Changed from `memberId` to `userId`
+
+      if (!userId) {
+        console.warn(`No Member ID found for record ${recordId}, skipping.`);
+        continue;
+      }
+
+      const memberUpdateData = { // Changed `updateData` to `memberUpdateData`
+        customFields: {
+          companyid: fields['Company ID Used'] || '',
+          'mbr-type': fields['User'] || '',
+        },
+      };
+
+      try {
+        await updateMemberstackDetails(userId, memberUpdateData);
+        await updateAirtableRecord(recordId);
+      } catch (error) {
+        console.error(`Failed to update Memberstack or Airtable for record ${recordId}.`);
+      }
+    }
+  } catch (error) {
+    console.error('Error processing records:', error.message);
+  }
+}
+
+
+// Function for the periodic sync task
+async function runPeriodicallySync(intervalMs) {
   console.log("Starting periodic sync...");
   setInterval(async () => {
     console.log(`Running sync at ${new Date().toISOString()}`);
-    await processRecords();
+    await processRecords();  // Call the processRecords function here
   }, intervalMs);
 }
 
-runPeriodicallys(20 * 1000);
+// Function to run update process
+async function runPeriodicUpdate(intervalMs) {
+  console.log("Starting periodic update...");
+  setInterval(async () => {
+    console.log(`Running update process at ${new Date().toISOString()}`);
+    await processAndUpdateRecords();  // Call the processRecords function here
+  }, intervalMs);
+}
 
+// Call processRecords() immediately first
+console.log('Running processRecords immediately...');
+processRecords();
 
+// Run the periodic sync (every 20 seconds)
+runPeriodicallySync(40 * 1000);
 
+// Run the update process (every 15 minutes)
+runPeriodicUpdate(2 * 60 * 1000);
 
-// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
