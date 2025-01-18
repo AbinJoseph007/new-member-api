@@ -32,6 +32,10 @@ app.get("/", (req, res) => {
 });
 
 
+app.get('/keep-alive', (req, res) => {
+  res.send('Service is alive');
+});
+
 const AIRTABLE_TABLE_NAME = process.env.AIRTABLE_TABLE_NAME
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -172,7 +176,7 @@ app.post("/send-otp", async (req, res) => {
       <p>Welcome and thanks!</p>`;
       
         } else {
-          return res.status(400).json({ error: "Email already verified or OTP already sent." });
+          return res.status(400).json({ error: "Email already verified." });
         }
     } else {
       // Create a new record for first-time users
@@ -354,7 +358,7 @@ async function checkCompanyIds(companyId) {
 
   if (records.length > 1) {
     const values = records.map(record => record.fields["Member Type"]);
-    return { values, selected: values[0] }; // Default to the first value
+    return { values, selected: values[0] }; 
   }
 
   return { values: [records[0].fields["Member Type"]], selected: records[0].fields["Member Type"] };
@@ -712,7 +716,7 @@ async function processRecords() {
         Password,
         User,
         'Create Account': createAccount,
-        Director, // This is the checkbox field
+        Director, // Checkbox field
       } = fields;
 
       console.log(`Processing record for email: ${email}`);
@@ -720,10 +724,8 @@ async function processRecords() {
       if (createAccount === 'Create/update') {
         let memberId = await checkMemberstackEmail(email);
 
-        // Trim the password to remove any leading/trailing spaces
+        // Trim and validate the password
         const cleanedPassword = Password ? Password.trim() : '';
-
-        // Skip if password is invalid
         if (!cleanedPassword || cleanedPassword.length < 8) {
           console.log(`Password for ${email} is invalid (must be at least 8 characters). Skipping...`);
           continue;
@@ -737,7 +739,7 @@ async function processRecords() {
             "last-name": lastName || "",
             company: companyName || "",
             companyid: companyId || "",
-            director: Director ? "Director" : "Non-Director", // Set based on the Director checkbox
+            director: Director ? "Director" : "Non-Director",
             "mbr-type": User || "",
           },
         };
@@ -747,13 +749,51 @@ async function processRecords() {
           await updateMemberstack(id, memberId, memberData);
         } else {
           console.log(`No Memberstack member found for ${email}. Creating new member...`);
-          const newMemberId = await createMemberstackMember({ email, password: cleanedPassword, customFields: memberData.customFields });
+          const newMemberId = await createMemberstackMember({
+            email,
+            password: cleanedPassword,
+            customFields: memberData.customFields,
+          });
 
           if (newMemberId) {
             await updateAirtableAfterCreatingMember(id, newMemberId, email, cleanedPassword, firstName, lastName);
           } else {
             console.error('Failed to create new Memberstack member. Skipping Airtable update.');
           }
+        }
+
+        // Update the "Members" table
+        const memberRecords = await base("Members")
+          .select({ filterByFormula: `{Email Address} = '${email}'` })
+          .firstPage();
+
+        const userType = User ? "Member" : "Non-Member";
+        const safeCompanyId = companyId || null;
+        const safeMemberType = User || null;
+
+        if (memberRecords.length > 0) {
+          const memberRecord = memberRecords[0];
+          const existingData = memberRecord.fields;
+
+          const updatedData = {
+            "Company ID Used": safeCompanyId,
+            User: safeMemberType,
+            UserType: userType,
+            "Membership Update Status": "Updated",
+          };
+
+          const hasChanges = Object.entries(updatedData).some(
+            ([key, value]) => existingData[key] !== value
+          );
+
+          if (hasChanges) {
+            await base("Members").update(memberRecord.id, updatedData);
+            console.log(`Updated 'Members' table for email: ${email}`);
+          } else {
+            console.log(`No changes detected for email: ${email}. Skipping update.`);
+          }
+        } else {
+          console.warn(`No matching record found in 'Members' table for email: ${email}`);
         }
       } else {
         console.log(`Skipping record for email: ${email} (Create Account is not 'Create/update')`);
@@ -763,6 +803,7 @@ async function processRecords() {
     console.error('Error processing records:', error.response ? error.response.data : error.message);
   }
 }
+
 
 
 
@@ -833,14 +874,14 @@ async function processAndUpdateRecords() {
 
     for (const record of records) {
       const { id: recordId, fields } = record;
-      const userId = fields['Member ID']; // Changed from `memberId` to `userId`
+      const userId = fields['Member ID']; 
 
       if (!userId) {
         console.warn(`No Member ID found for record ${recordId}, skipping.`);
         continue;
       }
 
-      const memberUpdateData = { // Changed `updateData` to `memberUpdateData`
+      const memberUpdateData = { 
         customFields: {
           companyid: fields['Company ID Used'] || '',
           'mbr-type': fields['User'] || '',
@@ -865,7 +906,7 @@ async function runPeriodicallySync(intervalMs) {
   console.log("Starting periodic sync...");
   setInterval(async () => {
     console.log(`Running sync at ${new Date().toISOString()}`);
-    await processRecords();  // Call the processRecords function here
+    await processRecords();  
   }, intervalMs);
 }
 
@@ -874,7 +915,7 @@ async function runPeriodicUpdate(intervalMs) {
   console.log("Starting periodic update...");
   setInterval(async () => {
     console.log(`Running update process at ${new Date().toISOString()}`);
-    await processAndUpdateRecords();  // Call the processRecords function here
+    await processAndUpdateRecords(); 
   }, intervalMs);
 }
 
