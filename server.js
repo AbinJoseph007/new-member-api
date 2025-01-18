@@ -806,18 +806,6 @@ async function processRecords() {
 
 
 
-
-// async function runPeriodicallys(intervalMs) {
-//   console.log("Starting periodic sync...");
-//   setInterval(async () => {
-//     console.log(`Running sync at ${new Date().toISOString()}`);
-//     await processRecords();
-//   }, intervalMs);
-// }
-
-// runPeriodicallys(20 * 1000);
-
-
 const AIRTABLE_URL2 = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME3}`;
 
 // Fetch records from Airtable
@@ -867,21 +855,20 @@ async function updateAirtableRecord(recordId) {
   }
 }
 
-// Process and update records
 async function processAndUpdateRecords() {
   try {
     const records = await fetchUpdatedAirtableRecords();
 
     for (const record of records) {
       const { id: recordId, fields } = record;
-      const userId = fields['Member ID']; 
+      const userId = fields['Member ID'];
 
       if (!userId) {
         console.warn(`No Member ID found for record ${recordId}, skipping.`);
         continue;
       }
 
-      const memberUpdateData = { 
+      const memberUpdateData = {
         customFields: {
           companyid: fields['Company ID Used'] || '',
           'mbr-type': fields['User'] || '',
@@ -889,16 +876,48 @@ async function processAndUpdateRecords() {
       };
 
       try {
+        // Update Memberstack
+        console.log(`Updating Memberstack member ${userId}...`);
         await updateMemberstackDetails(userId, memberUpdateData);
+        console.log(`Memberstack member ${userId} updated successfully.`);
+
+        // Update Airtable record
+        console.log(`Updating Airtable record ${recordId}...`);
         await updateAirtableRecord(recordId);
+        console.log(`Airtable record ${recordId} updated successfully.`);
+
+        // Check if the email exists in the "Director" table
+        const directorRecords = await base("Directors")
+          .select({ filterByFormula: `{Email} = '${fields["Email Address"]}'` })
+          .firstPage();
+
+        if (directorRecords.length > 0) {
+          const directorRecord = directorRecords[0];
+          const directorRecordId = directorRecord.id;
+
+          // Prepare updated data for the "Director" table
+          const directorUpdateData = {
+            "Company ID": fields['Company ID Used'] || null,
+            "User": fields['User'] || null,
+          };
+
+          // Update the "Director" table
+          console.log(`Updating "Director" table for email: ${fields["Email Address"]}...`);
+          await base("Directors").update(directorRecordId, directorUpdateData);
+          console.log(`Updated "Director" table for email: ${fields["Email Address"]}`);
+        } else {
+          console.log(`Email ${fields["Email Address"]} not found in "Director" table. Skipping update.`);
+        }
       } catch (error) {
-        console.error(`Failed to update Memberstack or Airtable for record ${recordId}.`);
+        console.error(`Failed to update Memberstack or Airtable for record ${recordId}.`, error.response ? error.response.data : error.message);
       }
     }
   } catch (error) {
     console.error('Error processing records:', error.message);
   }
 }
+
+
 
 
 // Function for the periodic sync task
