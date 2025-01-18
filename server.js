@@ -825,7 +825,7 @@ async function fetchUpdatedAirtableRecords() {
   try {
     const response = await axios.get(AIRTABLE_URL2, { headers: airtableHeaders });
     const records = response.data.records.filter(
-      (record) => record.fields['Membership Update Status'] === 'Membership update status'
+      (record) => record.fields['Membership Update Status'] === 'update Member'
     );
     console.log(`Fetched ${records.length} records to update.`);
     return records;
